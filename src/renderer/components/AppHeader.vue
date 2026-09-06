@@ -2,7 +2,7 @@
   <div class="app-header">
     <div class="header-left">
       <el-icon :size="24" color="#409EFF"><Monitor /></el-icon>
-      <span class="app-title">DoInPXE</span>
+      <span class="app-title">BenchFlow</span>
     </div>
     <div class="header-right">
       <el-button :icon="SetUp" @click="$emit('manage')">设备管理</el-button>
