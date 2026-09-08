@@ -1,15 +1,9 @@
 <template>
   <div class="app-container">
     <AppHeader @connect="showConnect = true" @manage="showDeviceManager = true" />
+    <ConnectionDialog v-model="showConnect" @connected="onConnected" />
+    <DeviceManager v-model="showDeviceManager" @connect="onDeviceConnect" />
     <div class="app-body">
-      <ConnectionDialog
-        v-model="showConnect"
-        @connected="onConnected"
-      />
-      <DeviceManager
-        v-model="showDeviceManager"
-        @connect="onDeviceConnect"
-      />
       <el-tabs
         v-if="tabs.length > 0"
         v-model="activeTab"
@@ -23,6 +17,7 @@
           :key="tab.id"
           :label="tab.label"
           :name="tab.id"
+          class="main-tab-pane"
         >
           <ServerWorkspace :connection-id="tab.id" :host="tab.host" />
         </el-tab-pane>
@@ -94,7 +89,6 @@ async function onDeviceConnect(device: SavedDevice) {
       host: device.host
     })
     activeTab.value = connId
-
     await window.api.device.update(device.id, { lastConnected: Date.now() })
     ElMessage.success(`已连接到 ${device.name}`)
   } catch (err: any) {
@@ -120,6 +114,8 @@ async function onTabClose(tabId: string) {
 
 html, body, #app {
   height: 100%;
+  width: 100%;
+  overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -127,7 +123,8 @@ html, body, #app {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #f5f5f5;
+  width: 100vw;
+  background: #f0f2f5;
 }
 
 .app-body {
@@ -137,15 +134,32 @@ html, body, #app {
   flex-direction: column;
 }
 
+/* 主 Tab 容器 */
 .main-tabs {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 0 12px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.main-tabs .el-tabs__header {
+  margin: 0;
+  padding: 0 8px;
+  flex-shrink: 0;
 }
 
 .main-tabs .el-tabs__content {
   flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-tab-pane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 

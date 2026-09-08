@@ -1,109 +1,180 @@
 <template>
   <div class="testsuit-manager">
+    <!-- 工具栏 -->
     <div class="testsuit-toolbar">
       <el-input
         v-model="suitDirPath"
         placeholder="testsuit 目录路径"
-        style="width: 360px"
+        class="path-input"
       >
         <template #prepend><el-icon><FolderOpened /></el-icon></template>
       </el-input>
       <el-button :icon="Download" @click="loadTestSuits">加载</el-button>
+      <el-button :icon="Refresh" @click="loadTestSuits" :disabled="!suits.length">刷新</el-button>
       <el-input
         v-model="searchQuery"
-        placeholder="搜索测试套件"
-        style="width: 200px; margin-left: auto"
-        :icon="Search"
+        placeholder="搜索"
+        class="search-input"
+        :prefix-icon="Search"
         clearable
       />
     </div>
 
-    <div class="testsuit-content">
-      <div class="suit-card-list">
-        <div
-          v-for="suit in filteredSuits"
-          :key="suit.id"
-          class="suit-card"
-          @click="selectSuit(suit)"
-        >
-          <div class="suit-card-header">
-            <el-icon color="#409EFF"><Document /></el-icon>
-            <span class="suit-name">{{ suit.name }}</span>
-          </div>
-          <div class="suit-card-desc">{{ suit.description || '无描述' }}</div>
-          <div class="suit-card-footer">
-            <el-tag size="small">{{ suit.cases.length }} 个用例</el-tag>
-            <el-tag size="small" type="success">
-              {{ suit.cases.filter(c => c.enabled).length }} 启用
-            </el-tag>
-          </div>
-        </div>
-        <el-empty v-if="!filteredSuits.length" description="暂无测试套件" />
-      </div>
-
-      <el-drawer
-        v-model="showDetail"
-        :title="selectedSuit?.name || '测试套件'"
-        size="50%"
-        direction="rtl"
+    <!-- 卡片列表 -->
+    <div class="suit-grid">
+      <div
+        v-for="suit in filteredSuits"
+        :key="suit.fileName"
+        class="suit-card"
+        @click="selectSuit(suit)"
       >
-        <div v-if="selectedSuit" class="suit-detail">
-          <el-form label-width="80px">
-            <el-form-item label="名称">
-              <el-input v-model="selectedSuit.name" />
-            </el-form-item>
-            <el-form-item label="描述">
-              <el-input v-model="selectedSuit.description" type="textarea" :rows="2" />
-            </el-form-item>
-          </el-form>
-
-          <div class="case-section">
-            <div class="case-header">
-              <span>测试用例</span>
-              <el-button size="small" :icon="Plus">添加用例</el-button>
-            </div>
-            <div class="case-list">
-              <div v-for="tc in selectedSuit.cases" :key="tc.id" class="case-item">
-                <el-switch v-model="tc.enabled" size="small" />
-                <span class="case-name">{{ tc.name }}</span>
-                <el-button size="small" :icon="Edit" @click="editCase(tc)" />
-                <el-button size="small" type="danger" :icon="Delete" @click="removeCase(tc)" />
-              </div>
-            </div>
-          </div>
-
-          <div class="detail-footer">
-            <el-button type="success" @click="saveSuit">保存</el-button>
+        <div class="suit-card-header">
+          <el-icon color="#409EFF" :size="20"><Document /></el-icon>
+          <span class="suit-name">{{ suit.fileName }}</span>
+        </div>
+        <div class="suit-card-body">
+          <div class="suit-field" v-for="(val, key) in getPreview(suit)" :key="key">
+            <span class="suit-field-key">{{ key }}:</span>
+            <span class="suit-field-val">{{ formatValue(val) }}</span>
           </div>
         </div>
-      </el-drawer>
+        <div class="suit-card-footer">
+          <el-tag size="small" type="info">{{ Object.keys(suit.data).length }} 字段</el-tag>
+          <el-tag size="small" type="success">{{ suit.modified ? '已修改' : '原始' }}</el-tag>
+        </div>
+      </div>
+      <el-empty v-if="!filteredSuits.length" description="暂无测试套件，点击加载" />
     </div>
+
+    <!-- 详情编辑抽屉 -->
+    <el-drawer
+      v-model="showDetail"
+      :title="selectedSuit?.fileName || '测试套件'"
+      size="55%"
+      direction="rtl"
+    >
+      <div v-if="selectedSuit" class="suit-detail">
+        <div class="detail-header">
+          <span class="detail-title">参数编辑</span>
+          <el-button type="success" :icon="Check" @click="saveSuit">保存</el-button>
+        </div>
+
+        <el-form label-width="140px" label-position="right">
+          <el-form-item
+            v-for="(field, index) in selectedSuit.fields"
+            :key="index"
+            :label="field.key"
+          >
+            <div class="field-row">
+              <!-- 数组 -->
+              <div v-if="Array.isArray(field.value)" class="array-editor">
+                <el-tag
+                  v-for="(item, i) in field.value"
+                  :key="i"
+                  closable
+                  :disable-transitions="false"
+                  @close="removeArrayItem(index, i)"
+                  class="item-tag"
+                >
+                  {{ item }}
+                </el-tag>
+                <el-input
+                  v-if="arrayInputVisible === index"
+                  v-model="arrayInputValue"
+                  size="small"
+                  class="array-input"
+                  @keyup.enter="confirmArrayItem(index)"
+                  @blur="confirmArrayItem(index)"
+                />
+                <el-button v-else size="small" :icon="Plus" @click="showArrayInput(index)">添加</el-button>
+              </div>
+
+              <!-- 布尔 -->
+              <el-switch v-else-if="typeof field.value === 'boolean'" v-model="field.value" />
+
+              <!-- 数字 -->
+              <el-input-number
+                v-else-if="typeof field.value === 'number'"
+                v-model="field.value"
+                controls-position="right"
+                class="field-input"
+              />
+
+              <!-- 字符串 -->
+              <el-input
+                v-else
+                v-model="field.value"
+                class="field-input"
+              />
+
+              <el-button
+                type="danger"
+                :icon="Delete"
+                circle
+                size="small"
+                @click="removeField(index)"
+              />
+            </div>
+          </el-form-item>
+
+          <el-form-item label=" ">
+            <el-button :icon="Plus" @click="addField">添加字段</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import {
-  FolderOpened, Download, Search, Document,
-  Plus, Edit, Delete
-} from '@element-plus/icons-vue'
-import type { TestSuite, DirEntry } from '@shared/types'
+import { FolderOpened, Download, Refresh, Search, Document, Plus, Edit, Delete, Check } from '@element-plus/icons-vue'
+import type { DirEntry } from '@shared/types'
+
+interface SuitFile {
+  fileName: string
+  filePath: string
+  data: Record<string, any>
+  fields: { key: string; value: any }[]
+  modified: boolean
+}
 
 const props = defineProps<{ connectionId: string }>()
 
 const suitDirPath = ref('')
-const suits = ref<TestSuite[]>([])
+const suits = ref<SuitFile[]>([])
 const searchQuery = ref('')
 const showDetail = ref(false)
-const selectedSuit = ref<TestSuite | null>(null)
+const selectedSuit = ref<SuitFile | null>(null)
+const arrayInputVisible = ref(-1)
+const arrayInputValue = ref('')
+
+onMounted(async () => {
+  const config = await window.api.config.get()
+  suitDirPath.value = config.testSuitDirPath
+})
 
 const filteredSuits = computed(() => {
   if (!searchQuery.value) return suits.value
-  return suits.value.filter(s =>
-    s.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-  )
+  const q = searchQuery.value.toLowerCase()
+  return suits.value.filter(s => s.fileName.toLowerCase().includes(q))
 })
+
+const previewKeys = ['name', 'suit', 'type', 'description', 'mode']
+
+function getPreview(suit: SuitFile): Record<string, any> {
+  const result: Record<string, any> = {}
+  for (const key of previewKeys) {
+    if (suit.data[key] !== undefined) {
+      result[key] = suit.data[key]
+    }
+  }
+  if (Object.keys(result).length === 0 && suit.fields.length > 0) {
+    result[suit.fields[0].key] = suit.fields[0].value
+  }
+  return result
+}
 
 async function loadTestSuits() {
   if (!suitDirPath.value) {
@@ -120,7 +191,13 @@ async function loadTestSuits() {
         const filePath = `${suitDirPath.value.replace(/\/$/, '')}/${file.name}`
         const content = await window.api.ssh.readFile(props.connectionId, filePath)
         const data = JSON.parse(content)
-        suits.value.push(normalizeSuit(data, file.name))
+        suits.value.push({
+          fileName: file.name,
+          filePath,
+          data,
+          fields: Object.entries(data).map(([key, value]) => ({ key, value: JSON.parse(JSON.stringify(value)) })),
+          modified: false
+        })
       } catch {}
     }
     ElMessage.success(`加载了 ${suits.value.length} 个测试套件`)
@@ -129,52 +206,76 @@ async function loadTestSuits() {
   }
 }
 
-function normalizeSuit(data: any, fileName: string): TestSuite {
-  return {
-    id: data.id || fileName,
-    name: data.name || fileName.replace('.json', ''),
-    description: data.description || '',
-    cases: (data.cases || []).map((c: any, i: number) => ({
-      id: c.id || `case_${i}`,
-      name: c.name || `case_${i}`,
-      enabled: c.enabled !== false,
-      params: c.params || {}
-    }))
+function selectSuit(suit: SuitFile) {
+  selectedSuit.value = {
+    ...suit,
+    fields: suit.fields.map((f: { key: string; value: any }) => ({ ...f, value: JSON.parse(JSON.stringify(f.value)) }))
   }
-}
-
-function selectSuit(suit: TestSuite) {
-  selectedSuit.value = JSON.parse(JSON.stringify(suit))
   showDetail.value = true
 }
 
-function editCase(tc: any) {
-  ElMessage.info('用例编辑功能待完善')
+function showArrayInput(index: number) {
+  arrayInputVisible.value = index
+  arrayInputValue.value = ''
 }
 
-function removeCase(tc: any) {
+function confirmArrayItem(index: number) {
+  const val = arrayInputValue.value.trim()
+  if (val && selectedSuit.value) {
+    const field = selectedSuit.value.fields[index]
+    if (!Array.isArray(field.value)) field.value = []
+    field.value.push(val)
+  }
+  arrayInputVisible.value = -1
+  arrayInputValue.value = ''
+}
+
+function removeArrayItem(fieldIndex: number, itemIndex: number) {
   if (selectedSuit.value) {
-    selectedSuit.value.cases = selectedSuit.value.cases.filter(c => c.id !== tc.id)
+    selectedSuit.value.fields[fieldIndex].value.splice(itemIndex, 1)
+  }
+}
+
+function addField() {
+  if (selectedSuit.value) {
+    selectedSuit.value.fields.push({ key: 'new_field', value: '' })
+  }
+}
+
+function removeField(index: number) {
+  if (selectedSuit.value) {
+    selectedSuit.value.fields.splice(index, 1)
   }
 }
 
 async function saveSuit() {
   if (!selectedSuit.value) return
-  const idx = suits.value.findIndex(s => s.id === selectedSuit.value!.id)
-  if (idx >= 0) {
-    suits.value[idx] = { ...selectedSuit.value }
+  const data: Record<string, any> = {}
+  for (const field of selectedSuit.value.fields) {
+    data[field.key] = field.value
   }
-  const filePath = `${suitDirPath.value.replace(/\/$/, '')}/${selectedSuit.value.id}`
   try {
     await window.api.ssh.writeFile(
       props.connectionId,
-      filePath,
-      JSON.stringify(selectedSuit.value, null, 2)
+      selectedSuit.value.filePath,
+      JSON.stringify(data, null, 2)
     )
+    const idx = suits.value.findIndex(s => s.fileName === selectedSuit.value!.fileName)
+    if (idx >= 0) {
+      suits.value[idx].data = data
+      suits.value[idx].fields = selectedSuit.value.fields
+      suits.value[idx].modified = true
+    }
     ElMessage.success('保存成功')
   } catch (err: any) {
     ElMessage.error(`保存失败: ${err.message || err}`)
   }
+}
+
+function formatValue(val: any): string {
+  if (Array.isArray(val)) return val.join(', ')
+  if (typeof val === 'boolean') return val ? '是' : '否'
+  return String(val)
 }
 </script>
 
@@ -184,24 +285,33 @@ async function saveSuit() {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow: hidden;
 }
 
 .testsuit-toolbar {
   display: flex;
   gap: 8px;
   align-items: center;
-  padding: 8px 0;
+  flex-shrink: 0;
 }
 
-.testsuit-content {
+.path-input {
+  width: 360px;
+}
+
+.search-input {
+  width: 200px;
+  margin-left: auto;
+}
+
+.suit-grid {
   flex: 1;
-  overflow: auto;
-}
-
-.suit-card-list {
+  overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px;
+  align-content: start;
+  padding-bottom: 12px;
 }
 
 .suit-card {
@@ -210,30 +320,51 @@ async function saveSuit() {
   border-radius: 8px;
   padding: 16px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
 .suit-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  border-color: #409EFF;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: #409eff;
+  transform: translateY(-1px);
 }
 
 .suit-card-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .suit-name {
   font-weight: 600;
   font-size: 15px;
+  color: #303133;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.suit-card-desc {
-  font-size: 13px;
-  color: #909399;
+.suit-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   margin-bottom: 12px;
+}
+
+.suit-field {
+  display: flex;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.suit-field-key {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.suit-field-val {
+  color: #606266;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -248,42 +379,49 @@ async function saveSuit() {
   padding: 0 8px;
 }
 
-.case-section {
-  margin-top: 16px;
-}
-
-.case-header {
+.detail-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.detail-title {
   font-weight: 600;
+  font-size: 16px;
 }
 
-.case-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.case-item {
+.field-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  background: #fafafa;
-  border-radius: 6px;
-  border: 1px solid #e4e7ed;
+  width: 100%;
 }
 
-.case-name {
+.field-input {
   flex: 1;
-  font-size: 14px;
 }
 
-.detail-footer {
-  margin-top: 20px;
+.array-editor {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  padding: 6px 8px;
+  background: #fafafa;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  min-height: 34px;
+}
+
+.item-tag {
+  margin: 0;
+}
+
+.array-input {
+  width: 140px;
 }
 </style>

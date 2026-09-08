@@ -4,12 +4,15 @@ import { SSHManager } from './ssh-manager'
 import type { SSHConfig } from './ssh-manager'
 import { DeviceStore } from './device-store'
 import type { SavedDevice } from './device-store'
+import { ConfigStore } from './config-store'
+import type { AppConfig } from './config-store'
 
 const isDev = !app.isPackaged
 
 let mainWindow: BrowserWindow | null = null
 const sshManager = new SSHManager()
 const deviceStore = new DeviceStore()
+const configStore = new ConfigStore()
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -65,6 +68,7 @@ ipcMain.handle('ssh:disconnect', async (_event, id: string) => {
 
 // IPC: 读取文件
 ipcMain.handle('ssh:readFile', async (_event, id: string, path: string) => {
+  console.log(`[ssh:readFile] id=${id}, path=${path}`)
   return sshManager.readFile(id, path)
 })
 
@@ -110,4 +114,13 @@ ipcMain.handle('device:remove', async (_event, id: string) => {
 
 ipcMain.handle('device:update', async (_event, id: string, patch: Partial<SavedDevice>) => {
   return deviceStore.update(id, patch)
+})
+
+// IPC: 配置管理
+ipcMain.handle('config:get', async () => {
+  return configStore.get()
+})
+
+ipcMain.handle('config:save', async (_event, config: Partial<AppConfig>) => {
+  return configStore.save(config)
 })

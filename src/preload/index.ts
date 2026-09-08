@@ -21,6 +21,10 @@ const api = {
     save: (device: any) => ipcRenderer.invoke('device:save', device),
     remove: (id: string) => ipcRenderer.invoke('device:remove', id),
     update: (id: string, patch: any) => ipcRenderer.invoke('device:update', id, patch)
+  },
+  config: {
+    get: () => ipcRenderer.invoke('config:get'),
+    save: (config: any) => ipcRenderer.invoke('config:save', config)
   }
 }
 

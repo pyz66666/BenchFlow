@@ -32,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { FolderOpened, Folder, Document, Back, Refresh } from '@element-plus/icons-vue'
 import type { DirEntry } from '@shared/types'
@@ -41,6 +41,12 @@ const props = defineProps<{ connectionId: string }>()
 
 const currentPath = ref('/home')
 const entries = ref<DirEntry[]>([])
+
+onMounted(async () => {
+  const config = await window.api.config.get()
+  currentPath.value = config.fileBrowsePath || '/home'
+  await navigate(currentPath.value)
+})
 
 const canGoUp = computed(() => currentPath.value !== '/' && currentPath.value !== '')
 

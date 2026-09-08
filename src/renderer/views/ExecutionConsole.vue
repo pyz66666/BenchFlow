@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { VideoPlay, VideoPause, Delete, Monitor } from '@element-plus/icons-vue'
 
@@ -46,6 +46,11 @@ const running = ref(false)
 const status = ref<'idle' | 'running' | 'success' | 'failed' | 'aborted'>('idle')
 const exitCode = ref(0)
 const outputRef = ref<HTMLElement | null>(null)
+
+onMounted(async () => {
+  const config = await window.api.config.get()
+  execCommand.value = config.execCommand
+})
 
 let unsubscribe: (() => void) | null = null
 

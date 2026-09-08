@@ -59,6 +59,18 @@ export interface DoInPXEAPI {
     remove: (id: string) => Promise<SavedDevice[]>
     update: (id: string, patch: Partial<SavedDevice>) => Promise<SavedDevice[]>
   }
+  config: {
+    get: () => Promise<AppConfig>
+    save: (config: Partial<AppConfig>) => Promise<AppConfig>
+  }
+}
+
+export interface AppConfig {
+  taskJsonPath: string
+  testSuitDirPath: string
+  execCommand: string
+  execWorkDir: string
+  fileBrowsePath: string
 }
 
 export interface SavedDevice {

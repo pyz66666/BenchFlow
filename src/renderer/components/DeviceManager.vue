@@ -19,7 +19,7 @@
         />
       </div>
 
-      <el-table :data="filteredDevices" stripe style="width: 100%" min-height="300">
+      <el-table :data="filteredDevices" stripe style="width: 100%" :row-style="{ height: '56px' }" :cell-style="{ padding: '8px 0' }">
         <el-table-column label="名称" min-width="160">
           <template #default="{ row }">
             <el-tooltip
@@ -39,11 +39,13 @@
             {{ row.lastConnected ? formatTime(row.lastConnected) : '—' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" type="primary" :icon="Link" @click="onConnect(row)">连接</el-button>
-            <el-button size="small" :icon="Edit" @click="onEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" :icon="Delete" @click="onRemove(row)">删除</el-button>
+            <div class="action-buttons">
+              <el-button size="small" type="primary" :icon="Link" @click="onConnect(row)">连接</el-button>
+              <el-button size="small" :icon="Edit" @click="onEdit(row)">编辑</el-button>
+              <el-button size="small" type="danger" :icon="Delete" @click="onRemove(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -143,5 +145,17 @@ function formatTime(ts: number): string {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.action-buttons .el-button {
+  margin-left: 0 !important;
 }
 </style>

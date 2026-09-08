@@ -1,5 +1,4 @@
 import { Client } from 'ssh2'
-import { exec as execCb } from 'child_process'
 
 export interface SSHConfig {
   id: string
@@ -13,6 +12,7 @@ interface SSHConnection {
   client: Client
   config: SSHConfig
   streams: Map<string, any>
+  sftp: any
 }
 
 export class SSHManager {
@@ -26,7 +26,8 @@ export class SSHManager {
         this.connections.set(config.id, {
           client,
           config,
-          streams: new Map()
+          streams: new Map(),
+          sftp: null
         })
         resolve(true)
       })
@@ -49,6 +50,7 @@ export class SSHManager {
     conn.streams.forEach((stream) => {
       try { stream.end() } catch {}
     })
+    try { conn.sftp?.end() } catch {}
     conn.client.end()
     this.connections.delete(id)
     return true
@@ -66,47 +68,55 @@ export class SSHManager {
     return conn
   }
 
-  async readFile(id: string, path: string): Promise<string> {
-    const conn = this.getConnection(id)
+  private getSftp(conn: SSHConnection): Promise<any> {
+    if (conn.sftp) return Promise.resolve(conn.sftp)
     return new Promise((resolve, reject) => {
       conn.client.sftp((err: Error | undefined, sftp: any) => {
         if (err) return reject(err)
-        sftp.readFile(path, 'utf-8', (err: Error | undefined, data: Buffer | string) => {
-          if (err) return reject(err)
-          resolve(typeof data === 'string' ? data : data.toString('utf-8'))
-        })
+        conn.sftp = sftp
+        resolve(sftp)
+      })
+    })
+  }
+
+  async readFile(id: string, path: string): Promise<string> {
+    const conn = this.getConnection(id)
+    const sftp = await this.getSftp(conn)
+    return new Promise((resolve, reject) => {
+      sftp.readFile(path, 'utf-8', (err: Error | undefined, data: Buffer | string) => {
+        if (err) {
+          reject(new Error(`读取文件失败: ${path} (code: ${(err as any).code})`))
+          return
+        }
+        resolve(typeof data === 'string' ? data : data.toString('utf-8'))
       })
     })
   }
 
   async writeFile(id: string, path: string, content: string): Promise<boolean> {
     const conn = this.getConnection(id)
+    const sftp = await this.getSftp(conn)
     return new Promise((resolve, reject) => {
-      conn.client.sftp((err: Error | undefined, sftp: any) => {
+      sftp.writeFile(path, content, 'utf-8', (err: Error | undefined) => {
         if (err) return reject(err)
-        sftp.writeFile(path, content, 'utf-8', (err: Error | undefined) => {
-          if (err) return reject(err)
-          resolve(true)
-        })
+        resolve(true)
       })
     })
   }
 
   async listDir(id: string, path: string): Promise<DirEntry[]> {
     const conn = this.getConnection(id)
+    const sftp = await this.getSftp(conn)
     return new Promise((resolve, reject) => {
-      conn.client.sftp((err: Error | undefined, sftp: any) => {
+      sftp.readdir(path, (err: Error | undefined, list: any[]) => {
         if (err) return reject(err)
-        sftp.readdir(path, (err: Error | undefined, list: any[]) => {
-          if (err) return reject(err)
-          const entries: DirEntry[] = list.map(item => ({
-            name: item.filename,
-            isDir: item.attrs.isDirectory(),
-            size: item.attrs.size,
-            modifyTime: item.attrs.mtime * 1000
-          }))
-          resolve(entries)
-        })
+        const entries: DirEntry[] = list.map(item => ({
+          name: item.filename,
+          isDir: item.attrs.isDirectory(),
+          size: item.attrs.size,
+          modifyTime: item.attrs.mtime * 1000
+        }))
+        resolve(entries)
       })
     })
   }
