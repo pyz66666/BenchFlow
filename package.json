@@ -1,6 +1,6 @@
 {
   "name": "benchflow",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "BenchFlow - PXE 任务编排桌面客户端",
   "author": "pyz",
   "license": "MIT",
