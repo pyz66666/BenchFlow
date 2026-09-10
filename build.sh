@@ -13,10 +13,18 @@ set -e
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
 
+# 自动加载 .env
+[ -f .env ] && export $(grep -v '^#' .env | xargs)
+
 export ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
 export ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries/"
 
+# GitHub 配置 (从环境变量读取 token)
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+GITHUB_REPO="pyz66666/BenchFlow"
+
 VERSION=$(node -p "require('./package.json').version")
+TAG="v${VERSION}"
 
 echo "========================================"
 echo "  BenchFlow v${VERSION} 打包脚本"
@@ -54,6 +62,82 @@ show_artifacts() {
     ls -lh release/*.dmg release/*.exe 2>/dev/null || echo "  无产物"
 }
 
+upload_to_release() {
+    echo ""
+    echo "========================================"
+    echo "  发布到 GitHub Release"
+    echo "========================================"
+
+    # 创建 tag
+    echo "创建 tag: ${TAG}"
+    git tag -a "${TAG}" -m "BenchFlow ${TAG}" 2>/dev/null || true
+    git push origin "${TAG}" 2>/dev/null || true
+
+    # 查找已有的 Release 或创建新的
+    echo "检查 Release..."
+    RESPONSE=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+        "https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${TAG}")
+
+    UPLOAD_URL=$(echo "$RESPONSE" | grep -o '"upload_url":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/{?name,label}//')
+    RELEASE_ID=$(echo "$RESPONSE" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
+
+    if [ -z "$UPLOAD_URL" ]; then
+        echo "创建新 Release..."
+        RESPONSE=$(curl -s -X POST \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"tag_name\":\"${TAG}\",\"name\":\"BenchFlow ${TAG}\",\"body\":\"BenchFlow ${TAG} 发布\"}" \
+            "https://api.github.com/repos/${GITHUB_REPO}/releases")
+        UPLOAD_URL=$(echo "$RESPONSE" | grep -o '"upload_url":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/{?name,label}//')
+    fi
+
+    if [ -z "$UPLOAD_URL" ]; then
+        echo "  ✗ 无法获取 upload_url"
+        echo "  响应: $(echo $RESPONSE | head -5)"
+        return 1
+    fi
+
+    if [ -z "$GITHUB_TOKEN" ]; then
+        echo "  ⚠ GITHUB_TOKEN 未设置，请创建 .env 文件："
+        echo "    echo 'GITHUB_TOKEN=你的token' > .env"
+        return 1
+    fi
+
+    echo "Upload URL: ${UPLOAD_URL}"
+
+    # 上传 Windows exe
+    EXE_FILE=$(ls release/*.exe 2>/dev/null | head -1)
+    if [ -n "$EXE_FILE" ]; then
+        EXE_NAME="BenchFlow-Setup-${VERSION}.exe"
+        echo "上传 ${EXE_NAME}..."
+        RESULT=$(curl -s -X POST \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"$EXE_FILE" \
+            "${UPLOAD_URL}?name=${EXE_NAME}")
+        STATE=$(echo "$RESULT" | grep -o '"state":"[^"]*"' | head -1)
+        echo "  $STATE"
+    fi
+
+    # 上传 macOS dmg
+    DMG_FILE=$(ls release/*.dmg 2>/dev/null | head -1)
+    if [ -n "$DMG_FILE" ]; then
+        DMG_NAME="BenchFlow-${VERSION}-arm64.dmg"
+        echo "上传 ${DMG_NAME}..."
+        RESULT=$(curl -s -X POST \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"$DMG_FILE" \
+            "${UPLOAD_URL}?name=${DMG_NAME}")
+        STATE=$(echo "$RESULT" | grep -o '"state":"[^"]*"' | head -1)
+        echo "  $STATE"
+    fi
+
+    echo ""
+    echo "  ✓ 发布完成"
+    echo "  Release: https://github.com/${GITHUB_REPO}/releases/tag/${TAG}"
+}
+
 case "${1:-all}" in
     mac)
         run_typecheck
@@ -80,29 +164,7 @@ case "${1:-all}" in
         build_mac
         build_win
         show_artifacts
-
-        echo ""
-        echo "========================================"
-        echo "  发布到 GitHub Release"
-        echo "========================================"
-
-        TAG="v${VERSION}"
-        echo "创建 tag: ${TAG}"
-        git tag -a "${TAG}" -m "BenchFlow ${TAG}"
-        git push origin "${TAG}" 2>/dev/null || true
-
-        if command -v gh &> /dev/null; then
-            echo "使用 gh CLI 发布..."
-            gh release create "${TAG}" \
-                --title "BenchFlow ${TAG}" \
-                --notes "BenchFlow ${TAG} 发布" \
-                release/*.dmg release/*.exe
-            echo "  ✓ 已发布到 GitHub Release"
-        else
-            echo "  ⚠ gh CLI 未安装，请手动上传以下文件到 GitHub Release:"
-            echo "    https://github.com/pyz66666/BenchFlow/releases/new?tag=${TAG}"
-            ls -lh release/*.dmg release/*.exe 2>/dev/null
-        fi
+        upload_to_release
         ;;
     *)
         echo "用法: ./build.sh [mac|win|all|release]"
