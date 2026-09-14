@@ -41,7 +41,7 @@
             <div class="task-info">
               <div class="task-info-top">
                 <el-tag type="primary" size="small" effect="light">
-                  {{ task.suit || '未命名' }}
+                  {{ task.suite || '未命名' }}
                 </el-tag>
                 <span class="task-detail" v-if="task.ips">
                   {{ Array.isArray(task.ips) ? task.ips.length : 0 }} 台机器
@@ -74,7 +74,13 @@
       </div>
     </div>
 
-    <TaskEditDialog v-model="showEditDialog" :task="editingTask" @save="onTaskSave" />
+    <TaskEditDialog
+      v-model="showEditDialog"
+      :task="editingTask"
+      :connection-id="connectionId"
+      :suit-dir-path="suitDirPath"
+      @save="onTaskSave"
+    />
   </div>
 </template>
 
@@ -92,6 +98,7 @@ const props = defineProps<{ connectionId: string }>()
 const emit = defineEmits<{ (e: 'navigate', view: string): void }>()
 
 const taskJsonPath = ref('')
+const suitDirPath = ref('')
 const tasks = ref<Record<string, any>[]>([])
 const showEditDialog = ref(false)
 const editingTask = ref<Record<string, any> | null>(null)
@@ -104,6 +111,8 @@ const taskJsonPreview = computed(() => {
 onMounted(async () => {
   const config = await window.api.config.get()
   taskJsonPath.value = config.taskJsonPath
+  suitDirPath.value = config.testSuitDirPath
+  await loadTaskJson()
 })
 
 function fixJsonContent(raw: string): string {
@@ -134,8 +143,8 @@ async function loadTaskJson() {
       data = JSON.parse(content)
     }
     tasks.value = (Array.isArray(data) ? data : (data.tasks || [])).map((t: any) => {
-      const { enabled, ...rest } = t
-      return rest
+      const { enabled, suit, suite, ...rest } = t
+      return { suite: suite || suit, ...rest }
     })
     ElMessage.success(`加载成功，共 ${tasks.value.length} 个任务`)
   } catch (err: any) {
@@ -183,8 +192,37 @@ function removeTask(index: number) {
     .catch(() => {})
 }
 
-function goToConsole() {
-  ElMessage.info('请到「执行日志」页面执行')
+async function goToConsole() {
+  try {
+    await ElMessageBox.confirm('将保存任务并执行，确认?', '执行任务', { type: 'warning' })
+  } catch {
+    return
+  }
+
+  if (!tasks.value.length) return
+
+  // 先保存 task.json
+  if (taskJsonPath.value) {
+    try {
+      const content = '[\n' + tasks.value.map(t => JSON.stringify(t)).join(',\n') + '\n]'
+      await window.api.ssh.writeFile(props.connectionId, taskJsonPath.value, content)
+    } catch (err: any) {
+      ElMessage.error(`保存失败: ${err.message || err}`)
+      return
+    }
+  }
+
+  // 读取执行配置
+  const config = await window.api.config.get()
+  const workDir = config.execWorkDir || '/home/AutoBench'
+  const cmd = config.execCommand || 'bash bin/submit_task.sh'
+  const fullCommand = cmd.startsWith('cd ') ? cmd : `cd ${workDir} && ${cmd}`
+
+  emit('navigate', 'console')
+  ElMessage.success('任务已保存，正在执行...')
+
+  // 通知执行日志页面执行
+  window.dispatchEvent(new CustomEvent('exec-task', { detail: { command: fullCommand } }))
 }
 
 async function copyJson() {

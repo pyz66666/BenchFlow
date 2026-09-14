@@ -71,6 +71,7 @@ export interface AppConfig {
   execCommand: string
   execWorkDir: string
   fileBrowsePath: string
+  downloadTxtPath: string
 }
 
 export interface SavedDevice {

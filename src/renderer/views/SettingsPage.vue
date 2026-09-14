@@ -9,20 +9,29 @@
       </template>
 
       <el-form :model="config" label-width="160px" label-position="right">
+        <el-divider content-position="left">路径配置</el-divider>
         <el-form-item label="task.json 路径">
           <el-input v-model="config.taskJsonPath" placeholder="/home/AutoBench/config/task.json" />
         </el-form-item>
         <el-form-item label="测试套件目录">
           <el-input v-model="config.testSuitDirPath" placeholder="/home/AutoBench/config/testsuit" />
         </el-form-item>
-        <el-form-item label="执行命令">
-          <el-input v-model="config.execCommand" placeholder="cd /home/AutoBench && ./run.sh" />
+        <el-form-item label="文件浏览目录">
+          <el-input v-model="config.fileBrowsePath" placeholder="/home/AutoBench/config" />
         </el-form-item>
+
+        <el-divider content-position="left">执行配置</el-divider>
         <el-form-item label="执行目录">
           <el-input v-model="config.execWorkDir" placeholder="/home/AutoBench" />
         </el-form-item>
-        <el-form-item label="文件浏览目录">
-          <el-input v-model="config.fileBrowsePath" placeholder="/home/AutoBench/config" />
+        <el-form-item label="执行命令">
+          <el-input v-model="config.execCommand" placeholder="bash bin/submit_task.sh" />
+          <div class="form-tip">实际执行: cd {执行目录} && {执行命令}</div>
+        </el-form-item>
+
+        <el-divider content-position="left">PXE 安装配置</el-divider>
+        <el-form-item label="download.txt 路径">
+          <el-input v-model="config.downloadTxtPath" placeholder="/home/AutoBench/download.txt" />
         </el-form-item>
       </el-form>
 
@@ -45,7 +54,8 @@ const config = ref<AppConfig>({
   testSuitDirPath: '',
   execCommand: '',
   execWorkDir: '',
-  fileBrowsePath: ''
+  fileBrowsePath: '',
+  downloadTxtPath: ''
 })
 
 onMounted(async () => {
@@ -73,6 +83,12 @@ async function saveConfig() {
   align-items: center;
   gap: 6px;
   font-weight: 600;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
 }
 
 .settings-footer {

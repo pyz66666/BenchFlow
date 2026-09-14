@@ -1,26 +1,34 @@
 <template>
-  <div class="execution-console">
-    <div class="console-toolbar">
-      <el-input
-        v-model="execCommand"
-        placeholder="执行命令 (如 cd /opt/pxe && ./run.sh)"
-        style="flex: 1"
-        @keyup.enter="execute"
-      >
-        <template #prepend><el-icon><Monitor /></el-icon></template>
-      </el-input>
-      <el-button type="primary" :icon="VideoPlay" @click="execute" :loading="running">
-        执行
-      </el-button>
-      <el-button type="danger" :icon="VideoPause" @click="abort" :disabled="!running">
-        中断
-      </el-button>
-      <el-button :icon="Delete" @click="clearLog">清屏</el-button>
+  <div class="pxe-install">
+    <div class="install-toolbar">
+      <div class="toolbar-left">
+        <el-icon :size="20" color="#E6A23C"><Cpu /></el-icon>
+        <span class="install-title">安装 OS</span>
+      </div>
+      <div class="toolbar-right">
+        <el-button type="primary" :icon="VideoPlay" @click="executeInstall" :loading="running">
+          执行安装
+        </el-button>
+        <el-button type="danger" :icon="VideoPause" @click="abortInstall" :disabled="!running">
+          中断
+        </el-button>
+        <el-button :icon="Delete" @click="clearLog">清屏</el-button>
+      </div>
+    </div>
+
+    <div class="install-info">
+      <el-alert
+        title="点击执行安装后将在 /home/AutoBench/ 目录下执行 bash bin/pxe_install.sh"
+        type="info"
+        :closable="false"
+        show-icon
+      />
     </div>
 
     <div class="console-output" ref="outputRef">
       <div v-for="(line, i) in logLines" :key="i" class="log-line">{{ line }}</div>
       <div v-if="running" class="log-line log-running">_</div>
+      <el-empty v-if="!logLines.length && !running" description="点击执行安装开始" :image-size="80" />
     </div>
 
     <div class="console-status">
@@ -35,47 +43,37 @@
 
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { VideoPlay, VideoPause, Delete, Monitor } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Cpu, VideoPlay, VideoPause, Delete } from '@element-plus/icons-vue'
 
 const props = defineProps<{ connectionId: string }>()
 
-const execCommand = ref('')
 const logLines = ref<string[]>([])
 const running = ref(false)
 const status = ref<'idle' | 'running' | 'success' | 'failed' | 'aborted'>('idle')
 const exitCode = ref(0)
 const outputRef = ref<HTMLElement | null>(null)
 
-onMounted(async () => {
-  const config = await window.api.config.get()
-  execCommand.value = buildCommand(config.execWorkDir, config.execCommand)
-})
-
-function buildCommand(workDir: string, command: string): string {
-  const dir = workDir || '/home/AutoBench'
-  const cmd = command || 'bash bin/submit_task.sh'
-  if (cmd.startsWith('cd ')) return cmd
-  return `cd ${dir} && ${cmd}`
-}
-
 let unsubscribe: (() => void) | null = null
 
-function executeCommand(command: string) {
-  execCommand.value = command
-  execute()
-}
-
-defineExpose({ executeCommand })
-
-async function execute() {
-  if (!execCommand.value || running.value) return
+async function executeInstall() {
+  try {
+    await ElMessageBox.confirm(
+      '确认执行 PXE 安装?\n将在 /home/AutoBench/ 目录下执行 bash bin/pxe_install.sh',
+      '执行确认',
+      { type: 'warning' }
+    )
+  } catch {
+    return
+  }
 
   logLines.value = []
   status.value = 'running'
   running.value = true
 
-  logLines.value.push(`$ ${execCommand.value}`)
+  const command = 'cd /home/AutoBench && bash bin/pxe_install.sh'
+
+  logLines.value.push(`$ ${command}`)
   logLines.value.push('─'.repeat(50))
 
   unsubscribe = window.api.ssh.onStream(props.connectionId, (data: string) => {
@@ -87,7 +85,7 @@ async function execute() {
   })
 
   try {
-    const result = await window.api.ssh.execStream(props.connectionId, execCommand.value)
+    const result = await window.api.ssh.execStream(props.connectionId, command)
     if (result.code === 0) {
       status.value = 'success'
     } else {
@@ -107,10 +105,15 @@ async function execute() {
   }
 }
 
-async function abort() {
-  ElMessage.info('中断功能待接入 execId')
+async function abortInstall() {
+  try {
+    await ElMessageBox.confirm('确认中断安装进程?', '中断确认', { type: 'warning' })
+  } catch {
+    return
+  }
   running.value = false
   status.value = 'aborted'
+  ElMessage.info('中断功能待接入 execId')
 }
 
 function clearLog() {
@@ -128,18 +131,39 @@ function scrollToBottom() {
 </script>
 
 <style scoped>
-.execution-console {
+.pxe-install {
   height: 100%;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow: hidden;
 }
 
-.console-toolbar {
+.install-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.install-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.toolbar-right {
   display: flex;
   gap: 8px;
-  align-items: center;
-  padding: 8px 0;
+}
+
+.install-info {
+  flex-shrink: 0;
 }
 
 .console-output {
@@ -173,5 +197,6 @@ function scrollToBottom() {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-shrink: 0;
 }
 </style>

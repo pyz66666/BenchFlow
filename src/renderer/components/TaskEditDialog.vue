@@ -15,13 +15,25 @@
         :label="field.key"
       >
         <div class="field-row">
-          <!-- suit: 文本 -->
-          <el-input
-            v-if="field.key === 'suit'"
-            v-model="field.value"
-            placeholder="套件名称"
-            class="field-input"
-          />
+          <!-- suite: 可选择测试套件文件名 -->
+          <div v-if="field.key === 'suite'" class="suite-editor">
+            <el-select
+              v-model="field.value"
+              filterable
+              allow-create
+              default-first-option
+              placeholder="选择或输入套件名称"
+              class="field-input"
+              @focus="loadSuiteOptions"
+            >
+              <el-option
+                v-for="opt in suiteOptions"
+                :key="opt"
+                :label="opt"
+                :value="opt"
+              />
+            </el-select>
+          </div>
 
           <!-- ips: 标签输入 -->
           <div v-else-if="field.key === 'ips'" class="ips-editor">
@@ -107,7 +119,7 @@
             circle
             size="small"
             @click="removeField(index)"
-            :disabled="field.key === 'suit'"
+            :disabled="field.key === 'suite'"
           />
         </div>
       </el-form-item>
@@ -129,6 +141,7 @@
 import { ref, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Delete } from '@element-plus/icons-vue'
+import type { DirEntry } from '@shared/types'
 
 interface FieldItem {
   key: string
@@ -138,6 +151,8 @@ interface FieldItem {
 const props = defineProps<{
   modelValue: boolean
   task: Record<string, any> | null
+  connectionId: string
+  suitDirPath: string
 }>()
 
 const emit = defineEmits(['update:modelValue', 'save'])
@@ -148,6 +163,8 @@ const ipInputValue = ref('')
 const ipInputRef = ref<any>(null)
 const arrayInputVisible = ref(-1)
 const arrayInputValue = ref('')
+const suiteOptions = ref<string[]>([])
+let suiteLoaded = false
 
 watch(() => props.modelValue, (val) => {
   if (val && props.task) {
@@ -156,12 +173,26 @@ watch(() => props.modelValue, (val) => {
       .map(([key, value]) => ({ key, value: JSON.parse(JSON.stringify(value)) }))
   } else if (val && !props.task) {
     form.value = [
-      { key: 'suit', value: '' },
+      { key: 'suite', value: '' },
       { key: 'ips', value: [] },
       { key: 'wait_time', value: 60 }
     ]
   }
+  suiteLoaded = false
 })
+
+async function loadSuiteOptions() {
+  if (suiteLoaded || !props.suitDirPath) return
+  suiteLoaded = true
+  try {
+    const entries = await window.api.ssh.listDir(props.connectionId, props.suitDirPath)
+    suiteOptions.value = entries
+      .filter((e: DirEntry) => !e.isDir && e.name.endsWith('.json'))
+      .map((e: DirEntry) => e.name.replace('.json', ''))
+  } catch {
+    suiteOptions.value = []
+  }
+}
 
 function showIpInput() {
   ipInputVisible.value = true
@@ -213,9 +244,9 @@ function removeField(index: number) {
 }
 
 function onSave() {
-  const suitField = form.value.find(f => f.key === 'suit')
-  if (!suitField || !suitField.value) {
-    ElMessage.warning('suit 字段不能为空')
+  const suiteField = form.value.find(f => f.key === 'suite')
+  if (!suiteField || !suiteField.value) {
+    ElMessage.warning('suite 字段不能为空')
     return
   }
   const result: Record<string, any> = {}
@@ -239,6 +270,10 @@ function onSave() {
   flex: 1;
 }
 
+.suite-editor {
+  flex: 1;
+}
+
 .ips-editor,
 .array-editor {
   display: flex;
@@ -246,11 +281,11 @@ function onSave() {
   flex-wrap: wrap;
   gap: 6px;
   flex: 1;
-  padding: 4px 8px;
+  padding: 6px 8px;
   background: #fafafa;
   border: 1px solid #dcdfe6;
   border-radius: 4px;
-  min-height: 32px;
+  min-height: 34px;
 }
 
 .ip-tag {

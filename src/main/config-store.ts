@@ -8,14 +8,16 @@ export interface AppConfig {
   execCommand: string
   execWorkDir: string
   fileBrowsePath: string
+  downloadTxtPath: string
 }
 
 const DEFAULT_CONFIG: AppConfig = {
   taskJsonPath: '/home/AutoBench/config/task.json',
   testSuitDirPath: '/home/AutoBench/config/testsuit',
-  execCommand: 'cd /home/AutoBench && ./run.sh',
+  execCommand: 'bash bin/submit_task.sh',
   execWorkDir: '/home/AutoBench',
-  fileBrowsePath: '/home/AutoBench/config'
+  fileBrowsePath: '/home/AutoBench/config',
+  downloadTxtPath: '/home/AutoBench/download.txt'
 }
 
 export class ConfigStore {
