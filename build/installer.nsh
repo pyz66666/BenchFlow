@@ -1,12 +1,16 @@
 !macro customInit
-  ; 安装前关闭已安装的 BenchFlow 进程
-  ; 按可执行文件路径匹配，避免误杀安装器自身
-  nsExec::ExecToLog 'powershell -Command "Get-Process BenchFlow -ErrorAction SilentlyContinue | Where-Object { $_.Path -ne $EXEPATH } | Stop-Process -Force"'
+  ; 强制关闭所有 BenchFlow 相关进程，不弹窗
+  nsExec::ExecToLog 'taskkill /F /IM BenchFlow.exe /T'
   Pop $0
-  Sleep 1000
+  nsExec::ExecToLog 'taskkill /F /IM "BenchFlow.exe" /T'
+  Pop $0
+  ; 等1秒确保进程完全退出
+  Sleep 1500
+!macroend
 
-  ; 兜底：再杀一次所有 BenchFlow 进程（安装器自身是临时文件名不会受影响）
-  nsExec::ExecToLog 'taskkill /F /IM BenchFlow.exe'
+!macro customInstall
+  ; 安装过程中再次确保进程关闭
+  nsExec::ExecToLog 'taskkill /F /IM BenchFlow.exe /T'
   Pop $0
   Sleep 500
 !macroend
