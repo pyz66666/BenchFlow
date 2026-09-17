@@ -15,24 +15,15 @@
         :label="field.key"
       >
         <div class="field-row">
-          <!-- suite: 可选择测试套件文件名 -->
+          <!-- suite: 可联想也可手动编辑 -->
           <div v-if="field.key === 'suite'" class="suite-editor">
-            <el-select
+            <el-autocomplete
               v-model="field.value"
-              filterable
-              allow-create
-              default-first-option
+              :fetch-suggestions="querySuites"
               placeholder="选择或输入套件名称"
               class="field-input"
-              @focus="loadSuiteOptions"
-            >
-              <el-option
-                v-for="opt in suiteOptions"
-                :key="opt"
-                :label="opt"
-                :value="opt"
-              />
-            </el-select>
+              clearable
+            />
           </div>
 
           <!-- ips: 标签输入 -->
@@ -168,9 +159,19 @@ let suiteLoaded = false
 
 watch(() => props.modelValue, (val) => {
   if (val && props.task) {
-    form.value = Object.entries(props.task)
+    const entries = Object.entries(props.task)
       .filter(([key]) => key !== 'enabled')
       .map(([key, value]) => ({ key, value: JSON.parse(JSON.stringify(value)) }))
+    // 兼容旧 suit -> suite
+    const suitIdx = entries.findIndex(e => e.key === 'suit')
+    if (suitIdx >= 0) {
+      entries[suitIdx].key = 'suite'
+    }
+    // 确保 suite 存在
+    if (!entries.find(e => e.key === 'suite')) {
+      entries.unshift({ key: 'suite', value: '' })
+    }
+    form.value = entries
   } else if (val && !props.task) {
     form.value = [
       { key: 'suite', value: '' },
@@ -179,11 +180,15 @@ watch(() => props.modelValue, (val) => {
     ]
   }
   suiteLoaded = false
+  if (val) {
+    loadSuiteOptions()
+  }
 })
 
 async function loadSuiteOptions() {
-  if (suiteLoaded || !props.suitDirPath) return
+  if (suiteLoaded) return
   suiteLoaded = true
+  if (!props.suitDirPath) return
   try {
     const entries = await window.api.ssh.listDir(props.connectionId, props.suitDirPath)
     suiteOptions.value = entries
@@ -192,6 +197,17 @@ async function loadSuiteOptions() {
   } catch {
     suiteOptions.value = []
   }
+}
+
+function querySuites(query: string, cb: (results: { value: string }[]) => void) {
+  if (!query) {
+    cb(suiteOptions.value.map(s => ({ value: s })))
+    return
+  }
+  const results = suiteOptions.value
+    .filter(s => s.toLowerCase().includes(query.toLowerCase()))
+    .map(s => ({ value: s }))
+  cb(results)
 }
 
 function showIpInput() {

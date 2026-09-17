@@ -9,11 +9,13 @@ const api = {
     listDir: (id: string, path: string) => ipcRenderer.invoke('ssh:listDir', id, path),
     exec: (id: string, command: string) => ipcRenderer.invoke('ssh:exec', id, command),
     execStream: (id: string, command: string) => ipcRenderer.invoke('ssh:execStream', id, command),
+    execWait: (execId: string) => ipcRenderer.invoke('ssh:execWait', execId),
     execAbort: (id: string, execId: string) => ipcRenderer.invoke('ssh:execAbort', id, execId),
-    onStream: (id: string, callback: (data: string) => void) => {
+    onStream: (id: string, execId: string, callback: (data: string) => void) => {
+      const channel = `ssh:stream:${id}:${execId}`
       const handler = (_event: any, data: string) => callback(data)
-      ipcRenderer.on(`ssh:stream:${id}`, handler)
-      return () => ipcRenderer.removeListener(`ssh:stream:${id}`, handler)
+      ipcRenderer.on(channel, handler)
+      return () => ipcRenderer.removeListener(channel, handler)
     }
   },
   device: {
@@ -25,6 +27,15 @@ const api = {
   config: {
     get: () => ipcRenderer.invoke('config:get'),
     save: (config: any) => ipcRenderer.invoke('config:save', config)
+  },
+  local: {
+    getIPs: () => ipcRenderer.invoke('local:getIPs')
+  },
+  tunnel: {
+    create: (config: any) => ipcRenderer.invoke('tunnel:create', config),
+    remove: (id: string) => ipcRenderer.invoke('tunnel:remove', id),
+    list: () => ipcRenderer.invoke('tunnel:list'),
+    removeAll: () => ipcRenderer.invoke('tunnel:removeAll')
   }
 }
 

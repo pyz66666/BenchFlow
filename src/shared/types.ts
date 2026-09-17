@@ -49,9 +49,10 @@ export interface DoInPXEAPI {
     writeFile: (id: string, path: string, content: string) => Promise<boolean>
     listDir: (id: string, path: string) => Promise<DirEntry[]>
     exec: (id: string, command: string) => Promise<ExecResult>
-    execStream: (id: string, command: string) => Promise<ExecResult>
+    execStream: (id: string, command: string) => Promise<{ execId: string }>
+    execWait: (execId: string) => Promise<ExecResult>
     execAbort: (id: string, execId: string) => Promise<boolean>
-    onStream: (id: string, callback: (data: string) => void) => () => void
+    onStream: (id: string, execId: string, callback: (data: string) => void) => () => void
   }
   device: {
     getAll: () => Promise<SavedDevice[]>
@@ -63,6 +64,44 @@ export interface DoInPXEAPI {
     get: () => Promise<AppConfig>
     save: (config: Partial<AppConfig>) => Promise<AppConfig>
   }
+  local: {
+    getIPs: () => Promise<LocalIP[]>
+  }
+  tunnel: {
+    create: (config: TunnelConfig) => Promise<TunnelInfo>
+    remove: (id: string) => Promise<boolean>
+    list: () => Promise<TunnelInfo[]>
+    removeAll: () => Promise<boolean>
+  }
+}
+
+export interface LocalIP {
+  category: string
+  ip: string
+}
+
+export interface TunnelConfig {
+  id: string
+  name: string
+  localPort: number
+  remoteHost: string
+  remotePort: number
+  sshHost: string
+  sshPort: number
+  sshUser: string
+  sshPassword: string
+  bindAddress: string
+}
+
+export interface TunnelInfo {
+  id: string
+  name: string
+  localPort: number
+  remoteHost: string
+  remotePort: number
+  sshHost: string
+  status: 'running' | 'stopped' | 'error'
+  bindAddress: string
 }
 
 export interface AppConfig {

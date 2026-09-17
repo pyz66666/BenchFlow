@@ -1,28 +1,27 @@
 <template>
   <div class="execution-console">
+    <!-- 工具栏 -->
     <div class="console-toolbar">
       <el-input
         v-model="execCommand"
-        placeholder="执行命令 (如 cd /opt/pxe && ./run.sh)"
-        style="flex: 1"
+        placeholder="执行命令"
+        class="cmd-input"
         @keyup.enter="execute"
       >
         <template #prepend><el-icon><Monitor /></el-icon></template>
       </el-input>
-      <el-button type="primary" :icon="VideoPlay" @click="execute" :loading="running">
-        执行
-      </el-button>
-      <el-button type="danger" :icon="VideoPause" @click="abort" :disabled="!running">
-        中断
-      </el-button>
+      <el-button type="primary" :icon="VideoPlay" @click="execute" :loading="running">执行</el-button>
+      <el-button type="danger" :icon="VideoPause" @click="abort" :disabled="!running">中断</el-button>
       <el-button :icon="Delete" @click="clearLog">清屏</el-button>
     </div>
 
+    <!-- 输出区域 -->
     <div class="console-output" ref="outputRef">
       <div v-for="(line, i) in logLines" :key="i" class="log-line">{{ line }}</div>
       <div v-if="running" class="log-line log-running">_</div>
     </div>
 
+    <!-- 状态栏 -->
     <div class="console-status">
       <el-tag v-if="status === 'idle'" type="info">就绪</el-tag>
       <el-tag v-else-if="status === 'running'" type="warning">运行中</el-tag>
@@ -47,19 +46,15 @@ const status = ref<'idle' | 'running' | 'success' | 'failed' | 'aborted'>('idle'
 const exitCode = ref(0)
 const outputRef = ref<HTMLElement | null>(null)
 
+let currentExecId: string | null = null
+let unsubscribe: (() => void) | null = null
+
 onMounted(async () => {
   const config = await window.api.config.get()
-  execCommand.value = buildCommand(config.execWorkDir, config.execCommand)
+  const workDir = config.execWorkDir || '/home/AutoBench'
+  const cmd = config.execCommand || 'bash bin/submit_task.sh'
+  execCommand.value = cmd.startsWith('cd ') ? cmd : `cd ${workDir} && ${cmd}`
 })
-
-function buildCommand(workDir: string, command: string): string {
-  const dir = workDir || '/home/AutoBench'
-  const cmd = command || 'bash bin/submit_task.sh'
-  if (cmd.startsWith('cd ')) return cmd
-  return `cd ${dir} && ${cmd}`
-}
-
-let unsubscribe: (() => void) | null = null
 
 function executeCommand(command: string) {
   execCommand.value = command
@@ -78,16 +73,20 @@ async function execute() {
   logLines.value.push(`$ ${execCommand.value}`)
   logLines.value.push('─'.repeat(50))
 
-  unsubscribe = window.api.ssh.onStream(props.connectionId, (data: string) => {
-    const lines = data.split('\n')
-    lines.forEach(line => {
-      if (line) logLines.value.push(line)
-    })
-    scrollToBottom()
-  })
-
   try {
-    const result = await window.api.ssh.execStream(props.connectionId, execCommand.value)
+    const { execId } = await window.api.ssh.execStream(props.connectionId, execCommand.value)
+    currentExecId = execId
+
+    unsubscribe = window.api.ssh.onStream(props.connectionId, execId, (data: string) => {
+      const lines = data.split('\n')
+      lines.forEach(line => {
+        if (line) logLines.value.push(line)
+      })
+      scrollToBottom()
+    })
+
+    const result = await window.api.ssh.execWait(execId)
+    if ((status.value as string) === 'aborted') return
     if (result.code === 0) {
       status.value = 'success'
     } else {
@@ -108,9 +107,20 @@ async function execute() {
 }
 
 async function abort() {
-  ElMessage.info('中断功能待接入 execId')
-  running.value = false
-  status.value = 'aborted'
+  if (!currentExecId || !running.value) return
+  try {
+    await window.api.ssh.execAbort(props.connectionId, currentExecId)
+    running.value = false
+    status.value = 'aborted'
+    logLines.value.push('\n[已中断]')
+    if (unsubscribe) {
+      unsubscribe()
+      unsubscribe = null
+    }
+    ElMessage.warning('执行已中断')
+  } catch (err: any) {
+    ElMessage.error(`中断失败: ${err.message || err}`)
+  }
 }
 
 function clearLog() {
@@ -139,7 +149,11 @@ function scrollToBottom() {
   display: flex;
   gap: 8px;
   align-items: center;
-  padding: 8px 0;
+  flex-shrink: 0;
+}
+
+.cmd-input {
+  flex: 1;
 }
 
 .console-output {
@@ -173,5 +187,6 @@ function scrollToBottom() {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-shrink: 0;
 }
 </style>

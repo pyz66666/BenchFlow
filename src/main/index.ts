@@ -1,11 +1,14 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
+import { execSync } from 'child_process'
 import { SSHManager } from './ssh-manager'
 import type { SSHConfig } from './ssh-manager'
 import { DeviceStore } from './device-store'
 import type { SavedDevice } from './device-store'
 import { ConfigStore } from './config-store'
 import type { AppConfig } from './config-store'
+import { TunnelManager } from './tunnel-manager'
+import type { TunnelConfig } from './tunnel-manager'
 
 const isDev = !app.isPackaged
 
@@ -13,6 +16,44 @@ let mainWindow: BrowserWindow | null = null
 const sshManager = new SSHManager()
 const deviceStore = new DeviceStore()
 const configStore = new ConfigStore()
+const tunnelManager = new TunnelManager()
+
+// 读取本机 IP
+function getLocalIPs(): { category: string; ip: string }[] {
+  const results: { category: string; ip: string }[] = []
+  try {
+    let output: string
+    if (process.platform === 'win32') {
+      output = execSync('ipconfig', { encoding: 'utf-8', timeout: 5000 })
+      const ipRegex = /IPv4[^\d]+(\d+\.\d+\.\d+\.\d+)/g
+      let match
+      while ((match = ipRegex.exec(output)) !== null) {
+        const ip = match[1]
+        results.push({ category: categorizeIP(ip), ip })
+      }
+    } else {
+      output = execSync('ifconfig 2>/dev/null || ip addr 2>/dev/null', { encoding: 'utf-8', timeout: 5000 })
+      const lines = output.split('\n')
+      for (const line of lines) {
+        const trimmed = line.trim()
+        const inetMatch = trimmed.match(/inet\s+(\d+\.\d+\.\d+\.\d+)/)
+        if (inetMatch) {
+          const ip = inetMatch[1]
+          if (ip === '127.0.0.1') continue
+          results.push({ category: categorizeIP(ip), ip })
+        }
+      }
+    }
+  } catch {}
+  return results
+}
+
+function categorizeIP(ip: string): string {
+  if (ip.startsWith('10.')) return '10'
+  if (ip.startsWith('141.')) return '141'
+  if (ip.startsWith('90.')) return '90'
+  return 'other'
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -87,11 +128,25 @@ ipcMain.handle('ssh:exec', async (_event, id: string, command: string) => {
   return sshManager.exec(id, command)
 })
 
-// IPC: 执行命令（流式输出）
+// IPC: 执行命令（流式输出）- 启动并返回 execId
+const pendingExecs = new Map<string, { promise: Promise<any> }>()
+
 ipcMain.handle('ssh:execStream', async (event, id: string, command: string) => {
-  return sshManager.execStream(id, command, (data: string) => {
-    event.sender.send(`ssh:stream:${id}`, data)
+  const { execId, promise } = sshManager.execStream(id, command, (data: string) => {
+    event.sender.send(`ssh:stream:${id}:${execId}`, data)
   })
+  // 不阻塞，把 promise 存起来
+  pendingExecs.set(execId, { promise })
+  return { execId }
+})
+
+// IPC: 等待执行完成
+ipcMain.handle('ssh:execWait', async (_event, execId: string) => {
+  const pending = pendingExecs.get(execId)
+  if (!pending) return { code: -1, stdout: '', stderr: 'execId not found' }
+  const result = await pending.promise
+  pendingExecs.delete(execId)
+  return result
 })
 
 // IPC: 中断执行
@@ -123,4 +178,26 @@ ipcMain.handle('config:get', async () => {
 
 ipcMain.handle('config:save', async (_event, config: Partial<AppConfig>) => {
   return configStore.save(config)
+})
+
+// IPC: 本机 IP
+ipcMain.handle('local:getIPs', async () => {
+  return getLocalIPs()
+})
+
+// IPC: SSH 隧道管理
+ipcMain.handle('tunnel:create', async (_event, config: TunnelConfig) => {
+  return tunnelManager.create(config)
+})
+
+ipcMain.handle('tunnel:remove', async (_event, id: string) => {
+  return tunnelManager.remove(id)
+})
+
+ipcMain.handle('tunnel:list', async () => {
+  return tunnelManager.list()
+})
+
+ipcMain.handle('tunnel:removeAll', async () => {
+  return tunnelManager.removeAll()
 })

@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Cpu, VideoPlay, VideoPause, Delete } from '@element-plus/icons-vue'
 
@@ -54,6 +54,7 @@ const status = ref<'idle' | 'running' | 'success' | 'failed' | 'aborted'>('idle'
 const exitCode = ref(0)
 const outputRef = ref<HTMLElement | null>(null)
 
+let currentExecId: string | null = null
 let unsubscribe: (() => void) | null = null
 
 async function executeInstall() {
@@ -76,16 +77,20 @@ async function executeInstall() {
   logLines.value.push(`$ ${command}`)
   logLines.value.push('─'.repeat(50))
 
-  unsubscribe = window.api.ssh.onStream(props.connectionId, (data: string) => {
-    const lines = data.split('\n')
-    lines.forEach(line => {
-      if (line) logLines.value.push(line)
-    })
-    scrollToBottom()
-  })
-
   try {
-    const result = await window.api.ssh.execStream(props.connectionId, command)
+    const { execId } = await window.api.ssh.execStream(props.connectionId, command)
+    currentExecId = execId
+
+    unsubscribe = window.api.ssh.onStream(props.connectionId, execId, (data: string) => {
+      const lines = data.split('\n')
+      lines.forEach(line => {
+        if (line) logLines.value.push(line)
+      })
+      scrollToBottom()
+    })
+
+    const result = await window.api.ssh.execWait(execId)
+    if ((status.value as string) === 'aborted') return
     if (result.code === 0) {
       status.value = 'success'
     } else {
@@ -106,14 +111,25 @@ async function executeInstall() {
 }
 
 async function abortInstall() {
+  if (!currentExecId || !running.value) return
   try {
     await ElMessageBox.confirm('确认中断安装进程?', '中断确认', { type: 'warning' })
   } catch {
     return
   }
-  running.value = false
-  status.value = 'aborted'
-  ElMessage.info('中断功能待接入 execId')
+  try {
+    await window.api.ssh.execAbort(props.connectionId, currentExecId)
+    running.value = false
+    status.value = 'aborted'
+    logLines.value.push('\n[已中断]')
+    if (unsubscribe) {
+      unsubscribe()
+      unsubscribe = null
+    }
+    ElMessage.warning('安装已中断')
+  } catch (err: any) {
+    ElMessage.error(`中断失败: ${err.message || err}`)
+  }
 }
 
 function clearLog() {

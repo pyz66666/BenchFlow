@@ -1,8 +1,9 @@
 <template>
   <div class="app-container">
-    <AppHeader @connect="showConnect = true" @manage="showDeviceManager = true" />
+    <AppHeader @connect="showConnect = true" @manage="showDeviceManager = true" @tunnel="showTunnelManager = true" />
     <ConnectionDialog v-model="showConnect" @connected="onConnected" />
     <DeviceManager v-model="showDeviceManager" @connect="onDeviceConnect" />
+    <TunnelManager v-model="showTunnelManager" />
     <div class="app-body">
       <el-tabs
         v-if="tabs.length > 0"
@@ -38,6 +39,7 @@ import { ElMessage } from 'element-plus'
 import AppHeader from './components/AppHeader.vue'
 import ConnectionDialog from './components/ConnectionDialog.vue'
 import DeviceManager from './components/DeviceManager.vue'
+import TunnelManager from './components/TunnelManager.vue'
 import ServerWorkspace from './views/ServerWorkspace.vue'
 import type { SavedDevice } from '@shared/types'
 
@@ -49,6 +51,7 @@ interface TabItem {
 
 const showConnect = ref(false)
 const showDeviceManager = ref(false)
+const showTunnelManager = ref(false)
 const tabs = ref<TabItem[]>([])
 const activeTab = ref('')
 

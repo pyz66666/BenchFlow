@@ -129,7 +129,7 @@ interface CsvRow {
 
 const CSV_HEADERS = ['arch', 'mac', 'ip', 'by_id', 'root_mb', 'ks_file']
 const templatePath = ref('/home/AutoBench/config/server_template.csv')
-const targetPath = ref('/var/www/html/script/server.csv')
+const targetPath = ref('/home/AutoBench/config/server.csv')
 
 const templateRows = ref<CsvRow[]>([])
 const targetRows = ref<CsvRow[]>([])

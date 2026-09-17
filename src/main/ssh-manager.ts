@@ -141,14 +141,14 @@ export class SSHManager {
     })
   }
 
-  async execStream(
+  execStream(
     id: string,
     command: string,
     onData: (data: string) => void
-  ): Promise<ExecResult> {
+  ): { execId: string; promise: Promise<ExecResult> } {
     const conn = this.getConnection(id)
     const execId = `exec_${++this.execCounter}`
-    return new Promise((resolve, reject) => {
+    const promise = new Promise<ExecResult>((resolve, reject) => {
       conn.client.exec(command, (err, stream) => {
         if (err) return reject(err)
         conn.streams.set(execId, stream)
@@ -170,6 +170,7 @@ export class SSHManager {
         })
       })
     })
+    return { execId, promise }
   }
 
   async execAbort(id: string, execId: string): Promise<boolean> {

@@ -4,7 +4,7 @@
     <div class="testsuit-toolbar">
       <el-input
         v-model="suitDirPath"
-        placeholder="testsuit 目录路径"
+        placeholder="test_suites 目录路径"
         class="path-input"
       >
         <template #prepend><el-icon><FolderOpened /></el-icon></template>
@@ -48,8 +48,12 @@
               <span class="field-value">{{ suit.data.taskcase.desc }}</span>
             </div>
             <div class="suit-field" v-if="suit.data.taskcase.package">
-              <span class="field-label">包</span>
+              <span class="field-label">package</span>
               <span class="field-value">{{ suit.data.taskcase.package }}</span>
+            </div>
+            <div class="suit-field" v-if="suit.data.taskcase.run_cmd">
+              <span class="field-label">run_cmd</span>
+              <span class="field-value">{{ suit.data.taskcase.run_cmd }}</span>
             </div>
           </template>
         </div>
@@ -82,18 +86,63 @@
 
         <el-divider content-position="left">taskcase 配置</el-divider>
         <el-form label-width="120px" label-position="right">
+          <el-form-item label="guid">
+            <div class="field-row">
+              <el-input v-model="editingSuit.data.taskcase!.guid" placeholder="如 TCxxxxxx" class="field-input" />
+              <el-button type="danger" :icon="Delete" circle size="small" @click="removeTaskcaseField('guid')" />
+            </div>
+          </el-form-item>
+          <el-form-item label="name">
+            <div class="field-row">
+              <el-input v-model="editingSuit.data.taskcase!.name" placeholder="用例名称" class="field-input" />
+              <el-button type="danger" :icon="Delete" circle size="small" @click="removeTaskcaseField('name')" />
+            </div>
+          </el-form-item>
+          <el-form-item label="package">
+            <div class="field-row">
+              <el-input v-model="editingSuit.data.taskcase!.package" placeholder="包路径" class="field-input" />
+              <el-button type="danger" :icon="Delete" circle size="small" @click="removeTaskcaseField('package')" />
+            </div>
+          </el-form-item>
+          <el-form-item label="desc">
+            <div class="field-row">
+              <el-input v-model="editingSuit.data.taskcase!.desc" placeholder="描述" class="field-input" />
+              <el-button type="danger" :icon="Delete" circle size="small" @click="removeTaskcaseField('desc')" />
+            </div>
+          </el-form-item>
+          <el-form-item label="create_by">
+            <div class="field-row">
+              <el-input v-model="editingSuit.data.taskcase!.create_by" placeholder="创建者" class="field-input" />
+              <el-button type="danger" :icon="Delete" circle size="small" @click="removeTaskcaseField('create_by')" />
+            </div>
+          </el-form-item>
+          <el-form-item label="config_info">
+            <div class="field-row">
+              <el-input v-model="editingSuit.data.taskcase!.config_info" placeholder="配置信息" class="field-input" />
+              <el-button type="danger" :icon="Delete" circle size="small" @click="removeTaskcaseField('config_info')" />
+            </div>
+          </el-form-item>
+          <el-form-item label="run_cmd">
+            <div class="field-row">
+              <el-input v-model="editingSuit.data.taskcase!.run_cmd" placeholder="执行命令" class="field-input" />
+              <el-button type="danger" :icon="Delete" circle size="small" @click="removeTaskcaseField('run_cmd')" />
+            </div>
+          </el-form-item>
+
+          <!-- 额外字段 -->
           <el-form-item
-            v-for="(field, index) in taskcaseFields"
+            v-for="(field, index) in extraTaskcaseFields"
             :key="index"
             :label="field.key"
           >
             <div class="field-row">
-              <el-input v-model="field.value" :placeholder="field.placeholder" class="field-input" />
-              <el-button type="danger" :icon="Delete" circle size="small" @click="removeTaskcaseField(index)" />
+              <el-input v-model="field.value" placeholder="字段值" class="field-input" />
+              <el-button type="danger" :icon="Delete" circle size="small" @click="removeExtraField(index)" />
             </div>
           </el-form-item>
+
           <el-form-item label=" ">
-            <el-button :icon="Plus" @click="addTaskcaseField">添加字段</el-button>
+            <el-button :icon="Plus" @click="addExtraField">添加字段</el-button>
           </el-form-item>
         </el-form>
       </div>
@@ -121,23 +170,21 @@ interface SuitFile {
   isNew: boolean
 }
 
-interface TaskcaseField {
+interface ExtraField {
   key: string
   value: any
-  placeholder?: string
 }
 
-const TEMPLATE: SuitFile['data'] = {
-  remark: '',
-  taskcase: {
-    guid: 'TCxxxxxx',
-    name: '',
-    package: '',
-    desc: '',
-    create_by: '',
-    config_info: '',
-    run_cmd: ''
-  }
+const STANDARD_FIELDS = ['guid', 'name', 'package', 'desc', 'create_by', 'config_info', 'run_cmd']
+
+const TEMPLATE_TASKCASE = {
+  guid: 'TCxxxxxx',
+  name: '',
+  package: '',
+  desc: '',
+  create_by: '',
+  config_info: '',
+  run_cmd: ''
 }
 
 const props = defineProps<{ connectionId: string }>()
@@ -147,11 +194,12 @@ const suits = ref<SuitFile[]>([])
 const searchQuery = ref('')
 const showDetail = ref(false)
 const editingSuit = ref<SuitFile | null>(null)
-const taskcaseFields = ref<TaskcaseField[]>([])
+const extraTaskcaseFields = ref<ExtraField[]>([])
 
 onMounted(async () => {
   const config = await window.api.config.get()
   suitDirPath.value = config.testSuitDirPath
+  await loadTestSuits()
 })
 
 const filteredSuits = computed(() => {
@@ -166,7 +214,7 @@ const filteredSuits = computed(() => {
 
 async function loadTestSuits() {
   if (!suitDirPath.value) {
-    ElMessage.warning('请输入 testsuit 目录路径')
+    ElMessage.warning('请输入 test_suites 目录路径')
     return
   }
   try {
@@ -194,36 +242,49 @@ async function loadTestSuits() {
 }
 
 function editSuit(suit: SuitFile) {
-  editingSuit.value = JSON.parse(JSON.stringify(suit))
-  syncTaskcaseFields()
+  const copy = JSON.parse(JSON.stringify(suit))
+  if (!copy.data.taskcase) {
+    copy.data.taskcase = {}
+  }
+  editingSuit.value = copy
+
+  // 收集非标准字段
+  const tc = copy.data.taskcase
+  extraTaskcaseFields.value = []
+  for (const [key, value] of Object.entries(tc)) {
+    if (!STANDARD_FIELDS.includes(key)) {
+      extraTaskcaseFields.value.push({ key, value })
+    }
+  }
+
   showDetail.value = true
 }
 
-function syncTaskcaseFields() {
-  const tc = editingSuit.value?.data?.taskcase || {}
-  taskcaseFields.value = Object.entries(tc).map(([key, value]) => ({
-    key,
-    value,
-    placeholder: ''
-  }))
+function removeTaskcaseField(key: string) {
+  if (editingSuit.value?.data.taskcase) {
+    delete editingSuit.value.data.taskcase[key]
+  }
 }
 
-function addTaskcaseField() {
-  taskcaseFields.value.push({ key: 'new_field', value: '', placeholder: '' })
+function addExtraField() {
+  extraTaskcaseFields.value.push({ key: 'new_field', value: '' })
 }
 
-function removeTaskcaseField(index: number) {
-  taskcaseFields.value.splice(index, 1)
+function removeExtraField(index: number) {
+  extraTaskcaseFields.value.splice(index, 1)
 }
 
 function addSuit() {
   editingSuit.value = {
     fileName: 'new_suite',
     filePath: `${suitDirPath.value.replace(/\/$/, '')}/new_suite.json`,
-    data: JSON.parse(JSON.stringify(TEMPLATE)),
+    data: {
+      remark: '',
+      taskcase: { ...TEMPLATE_TASKCASE }
+    },
     isNew: true
   }
-  syncTaskcaseFields()
+  extraTaskcaseFields.value = []
   showDetail.value = true
 }
 
@@ -236,9 +297,7 @@ async function copySuit(suit: SuitFile) {
     isNew: true
   }
   suits.value.push(copy)
-  editingSuit.value = copy
-  syncTaskcaseFields()
-  showDetail.value = true
+  editSuit(copy)
   ElMessage.success(`已拷贝为 ${newName}`)
 }
 
@@ -272,14 +331,21 @@ async function saveSuit() {
   const fileName = editingSuit.value.fileName.replace('.json', '') + '.json'
   const filePath = `${suitDirPath.value.replace(/\/$/, '')}/${fileName}`
 
-  const data: SuitFile['data'] = {
-    remark: editingSuit.value.data.remark || ''
-  }
+  // 合并标准字段和额外字段
   const taskcase: Record<string, any> = {}
-  for (const field of taskcaseFields.value) {
+  for (const key of STANDARD_FIELDS) {
+    if (editingSuit.value.data.taskcase && editingSuit.value.data.taskcase[key] !== undefined) {
+      taskcase[key] = editingSuit.value.data.taskcase[key]
+    }
+  }
+  for (const field of extraTaskcaseFields.value) {
     taskcase[field.key] = field.value
   }
-  data.taskcase = taskcase
+
+  const data = {
+    remark: editingSuit.value.data.remark || '',
+    taskcase
+  }
 
   try {
     await window.api.ssh.writeFile(
@@ -288,14 +354,9 @@ async function saveSuit() {
       JSON.stringify(data, null, 2)
     )
 
-    const idx = suits.value.findIndex(s => s === editingSuit.value || s.fileName === editingSuit.value!.fileName)
+    const idx = suits.value.findIndex(s => s.fileName === editingSuit.value!.fileName)
     if (idx >= 0) {
-      suits.value[idx] = {
-        fileName,
-        filePath,
-        data,
-        isNew: false
-      }
+      suits.value[idx] = { fileName, filePath, data, isNew: false }
     } else {
       suits.value.push({ fileName, filePath, data, isNew: false })
     }
@@ -403,7 +464,7 @@ function countFields(data: any): number {
 .field-label {
   color: #909399;
   flex-shrink: 0;
-  min-width: 36px;
+  min-width: 60px;
 }
 
 .field-value {

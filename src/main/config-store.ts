@@ -12,8 +12,8 @@ export interface AppConfig {
 }
 
 const DEFAULT_CONFIG: AppConfig = {
-  taskJsonPath: '/home/AutoBench/config/task.json',
-  testSuitDirPath: '/home/AutoBench/config/testsuit',
+  taskJsonPath: '/home/AutoBench/config/tasks.json',
+  testSuitDirPath: '/home/AutoBench/config/test_suites',
   execCommand: 'bash bin/submit_task.sh',
   execWorkDir: '/home/AutoBench',
   fileBrowsePath: '/home/AutoBench/config',

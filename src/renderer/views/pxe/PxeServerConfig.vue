@@ -15,14 +15,16 @@
             <template #prepend><el-icon><Document /></el-icon></template>
           </el-input>
         </div>
-        <el-input
-          v-model="dhcpContent"
-          type="textarea"
-          :rows="30"
-          placeholder="点击加载 dhcpd.conf"
-          class="file-textarea"
-          resize="none"
-        />
+        <div class="file-content-wrap">
+          <el-input
+            v-model="dhcpContent"
+            type="textarea"
+            placeholder="点击加载 dhcpd.conf"
+            class="file-textarea"
+            resize="none"
+            :autosize="{ minRows: 20 }"
+          />
+        </div>
       </div>
 
       <!-- 右侧：server.csv -->
@@ -39,14 +41,16 @@
             <template #prepend><el-icon><Document /></el-icon></template>
           </el-input>
         </div>
-        <el-input
-          v-model="serverContent"
-          type="textarea"
-          :rows="30"
-          placeholder="点击加载 server.csv"
-          class="file-textarea"
-          resize="none"
-        />
+        <div class="file-content-wrap">
+          <el-input
+            v-model="serverContent"
+            type="textarea"
+            placeholder="点击加载 server.csv"
+            class="file-textarea"
+            resize="none"
+            :autosize="{ minRows: 20 }"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -64,8 +68,6 @@ const serverPath = ref('/var/www/html/script/server.csv')
 const dhcpContent = ref('')
 const serverContent = ref('')
 
-const loadedFiles = ref<Record<string, boolean>>({ dhcp: false, server: false })
-
 onMounted(() => {
   loadFile('dhcp')
   loadFile('server')
@@ -80,7 +82,6 @@ async function loadFile(type: 'dhcp' | 'server') {
     } else {
       serverContent.value = content
     }
-    loadedFiles.value[type] = true
     ElMessage.success(`${type === 'dhcp' ? 'dhcpd.conf' : 'server.csv'} 加载成功`)
   } catch (err: any) {
     ElMessage.error(`加载失败: ${err.message || err}`)
@@ -166,16 +167,20 @@ async function saveFile(type: 'dhcp' | 'server') {
   gap: 6px;
 }
 
-.file-textarea {
+.file-content-wrap {
   flex: 1;
+  overflow: auto;
   padding: 8px;
+}
+
+.file-textarea {
+  width: 100%;
 }
 
 .file-textarea :deep(.el-textarea__inner) {
   font-family: 'SF Mono', Monaco, 'Courier New', monospace;
   font-size: 12px;
   line-height: 1.6;
-  height: 100% !important;
-  resize: none;
+  min-height: 400px !important;
 }
 </style>
