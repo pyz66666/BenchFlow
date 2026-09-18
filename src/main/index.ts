@@ -17,6 +17,26 @@ import type { TunnelConfig } from './tunnel-manager'
 
 const isDev = !app.isPackaged
 
+// 全局错误捕获
+process.on('uncaughtException', (err) => {
+  const fs = require('fs')
+  const path = require('path')
+  const logPath = path.join(app.getPath('userData'), 'error.log')
+  const log = `[${new Date().toISOString()}] uncaughtException: ${err.stack || err}\n`
+  try { fs.appendFileSync(logPath, log) } catch {}
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.executeJavaScript(`alert('${err.message.replace(/'/g, "\\'")}')`)
+  }
+})
+
+process.on('unhandledRejection', (err: any) => {
+  const fs = require('fs')
+  const path = require('path')
+  const logPath = path.join(app.getPath('userData'), 'error.log')
+  const log = `[${new Date().toISOString()}] unhandledRejection: ${err?.stack || err}\n`
+  try { fs.appendFileSync(logPath, log) } catch {}
+})
+
 let mainWindow: BrowserWindow | null = null
 const sshManager = new SSHManager()
 const deviceStore = new DeviceStore()
@@ -81,7 +101,11 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
   } else {
-    mainWindow.loadFile(join(__dirname, '../dist/index.html'))
+    // 打包后 dist-electron/ 和 dist/ 都在 app 根目录下
+    const indexPath = join(__dirname, '..', 'dist', 'index.html')
+    mainWindow.loadFile(indexPath).catch((err: any) => {
+      console.error('Failed to load index.html:', err)
+    })
   }
   mainWindow.on('closed', () => {
     mainWindow = null
