@@ -11,9 +11,10 @@
     "preview": "vite preview",
     "electron:dev": "vite && electron .",
     "electron:build": "vue-tsc --noEmit && vite build && electron-builder",
-    "electron:build:win": "vue-tsc --noEmit && vite build && electron-builder --win",
+    "electron:build:win": "vue-tsc --noEmit && vite build && electron-builder --win --x64 && npm run verify:win-package",
     "electron:build:mac": "vue-tsc --noEmit && vite build && electron-builder --mac",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit",
+    "verify:win-package": "node scripts/verify-win-package.cjs"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
@@ -49,8 +50,7 @@
       "node_modules/ssh2/**/*",
       "node_modules/ssh2-streams/**/*",
       "node_modules/node-ssh/**/*",
-      "!**/build/Release/*.node",
-      "!**/build/Debug/*.node"
+      "!**/*.node"
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
@@ -60,6 +60,7 @@
       ]
     },
     "win": {
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
       "target": [
         "nsis"
       ]

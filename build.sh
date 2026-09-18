@@ -59,7 +59,7 @@ show_artifacts() {
     echo "========================================"
     echo "  打包产物 (release/)"
     echo "========================================"
-    ls -lh release/*.dmg release/*.exe 2>/dev/null || echo "  无产物"
+    ls -lh "release/BenchFlow-Setup-${VERSION}-x64.exe" release/*.dmg 2>/dev/null || echo "  无产物"
 }
 
 upload_to_release() {
@@ -106,9 +106,9 @@ upload_to_release() {
     echo "Upload URL: ${UPLOAD_URL}"
 
     # 上传 Windows exe
-    EXE_FILE=$(ls release/*.exe 2>/dev/null | head -1)
-    if [ -n "$EXE_FILE" ]; then
-        EXE_NAME="BenchFlow-Setup-${VERSION}.exe"
+    EXE_FILE="release/BenchFlow-Setup-${VERSION}-x64.exe"
+    if [ -f "$EXE_FILE" ]; then
+        EXE_NAME="BenchFlow-Setup-${VERSION}-x64.exe"
         echo "上传 ${EXE_NAME}..."
         RESULT=$(curl -s -X POST \
             -H "Authorization: token ${GITHUB_TOKEN}" \
