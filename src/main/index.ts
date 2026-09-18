@@ -86,7 +86,7 @@ function createWindow() {
     minHeight: 600,
     title: 'BenchFlow',
     webPreferences: {
-      preload: join(app.getAppPath(), 'dist-electron', 'preload.js'),
+      preload: join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -97,12 +97,7 @@ function createWindow() {
     mainWindow.webContents.openDevTools()
   } else {
     // 打包后 dist/index.html 在 app 根目录
-    const indexPath = join(app.getAppPath(), 'dist', 'index.html')
-    writeErrorLog(`loading index.html from: ${indexPath}`)
-    mainWindow.loadFile(indexPath).catch((err: any) => {
-      writeErrorLog(`loadFile failed: ${err?.message || err}`)
-      dialog.showErrorBox('加载失败', `路径: ${indexPath}\n错误: ${err?.message || err}`)
-    })
+    mainWindow.loadFile(join(__dirname, '../dist/index.html'))
   }
 
   mainWindow.webContents.on('did-fail-load', (_event: any, errorCode: number, errorDescription: string) => {
