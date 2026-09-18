@@ -45,7 +45,12 @@
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "node_modules/ssh2/**/*",
+      "node_modules/ssh2-streams/**/*",
+      "node_modules/node-ssh/**/*",
+      "!**/build/Release/*.node",
+      "!**/build/Debug/*.node"
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
