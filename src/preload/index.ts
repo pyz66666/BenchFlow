@@ -36,6 +36,30 @@ const api = {
     remove: (id: string) => ipcRenderer.invoke('tunnel:remove', id),
     list: () => ipcRenderer.invoke('tunnel:list'),
     removeAll: () => ipcRenderer.invoke('tunnel:removeAll')
+  },
+  proxy: {
+    start: (port: number) => ipcRenderer.invoke('proxy:start', port),
+    stop: () => ipcRenderer.invoke('proxy:stop'),
+    status: () => ipcRenderer.invoke('proxy:status'),
+    getLogs: () => ipcRenderer.invoke('proxy:getLogs'),
+    clearLogs: () => ipcRenderer.invoke('proxy:clearLogs'),
+    onLog: (callback: (log: any) => void) => {
+      const handler = (_event: any, log: any) => callback(log)
+      ipcRenderer.on('proxy:log', handler)
+      return () => ipcRenderer.removeListener('proxy:log', handler)
+    }
+  },
+  proxyConfig: {
+    apply: (connId: string, proxyIP: string, port: number) => ipcRenderer.invoke('proxyConfig:apply', connId, proxyIP, port),
+    remove: (connId: string) => ipcRenderer.invoke('proxyConfig:remove', connId),
+    detectOS: (connId: string) => ipcRenderer.invoke('proxyConfig:detectOS', connId)
+  },
+  template: {
+    getAll: () => ipcRenderer.invoke('template:getAll'),
+    save: (template: any) => ipcRenderer.invoke('template:save', template),
+    remove: (id: string) => ipcRenderer.invoke('template:remove', id),
+    exportAll: () => ipcRenderer.invoke('template:export'),
+    import: (jsonStr: string) => ipcRenderer.invoke('template:import', jsonStr)
   }
 }
 

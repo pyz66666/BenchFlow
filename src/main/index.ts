@@ -8,6 +8,11 @@ import type { SavedDevice } from './device-store'
 import { ConfigStore } from './config-store'
 import type { AppConfig } from './config-store'
 import { TunnelManager } from './tunnel-manager'
+import { ProxyManager } from './proxy-manager'
+import type { ProxyLogEntry } from './proxy-manager'
+import { ProxyConfigManager } from './proxy-config-manager'
+import { TemplateStore } from './template-store'
+import type { TaskTemplate } from './template-store'
 import type { TunnelConfig } from './tunnel-manager'
 
 const isDev = !app.isPackaged
@@ -17,6 +22,9 @@ const sshManager = new SSHManager()
 const deviceStore = new DeviceStore()
 const configStore = new ConfigStore()
 const tunnelManager = new TunnelManager()
+const proxyManager = new ProxyManager()
+const proxyConfigManager = new ProxyConfigManager(sshManager)
+const templateStore = new TemplateStore()
 
 // 读取本机 IP
 function getLocalIPs(): { category: string; ip: string }[] {
@@ -200,4 +208,74 @@ ipcMain.handle('tunnel:list', async () => {
 
 ipcMain.handle('tunnel:removeAll', async () => {
   return tunnelManager.removeAll()
+})
+
+// IPC: 代理服务器
+ipcMain.handle('proxy:start', async (_event, port: number) => {
+  try {
+    proxyManager.start(port)
+    return true
+  } catch (err: any) {
+    console.error('[proxy:start]', err)
+    return false
+  }
+})
+
+ipcMain.handle('proxy:stop', async () => {
+  proxyManager.stop()
+  return true
+})
+
+ipcMain.handle('proxy:status', async () => {
+  return proxyManager.isRunning()
+})
+
+ipcMain.handle('proxy:getLogs', async () => {
+  return proxyManager.getLogs()
+})
+
+ipcMain.handle('proxy:clearLogs', async () => {
+  proxyManager.clearLogs()
+  return true
+})
+
+// 代理日志实时推送
+proxyManager.onLog((log: ProxyLogEntry) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('proxy:log', log)
+  }
+})
+
+// IPC: 代理配置（远程服务器）
+ipcMain.handle('proxyConfig:apply', async (_event, connId: string, proxyIP: string, port: number) => {
+  return proxyConfigManager.applyProxy(connId, proxyIP, port)
+})
+
+ipcMain.handle('proxyConfig:remove', async (_event, connId: string) => {
+  return proxyConfigManager.removeProxy(connId)
+})
+
+ipcMain.handle('proxyConfig:detectOS', async (_event, connId: string) => {
+  return proxyConfigManager.detectOS(connId)
+})
+
+// IPC: 任务模版管理
+ipcMain.handle('template:getAll', async () => {
+  return templateStore.getAll()
+})
+
+ipcMain.handle('template:save', async (_event, template: TaskTemplate) => {
+  return templateStore.save(template)
+})
+
+ipcMain.handle('template:remove', async (_event, id: string) => {
+  return templateStore.remove(id)
+})
+
+ipcMain.handle('template:export', async () => {
+  return templateStore.exportAll()
+})
+
+ipcMain.handle('template:import', async (_event, jsonStr: string) => {
+  return templateStore.import(jsonStr)
 })

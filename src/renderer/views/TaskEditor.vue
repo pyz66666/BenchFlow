@@ -14,6 +14,8 @@
         <el-button :icon="Refresh" @click="loadTaskJson" :disabled="!taskJsonPath">刷新</el-button>
       </div>
       <div class="toolbar-right">
+        <el-button :icon="Files" @click="showTemplateManager = true">模版</el-button>
+        <el-button :icon="CopyDocument" @click="saveAsTemplate" :disabled="!tasks.length">存为模版</el-button>
         <el-button type="success" :icon="Check" @click="saveTaskJson" :disabled="!tasks.length">保存</el-button>
         <el-button type="primary" :icon="VideoPlay" @click="goToConsole">执行</el-button>
       </div>
@@ -81,6 +83,40 @@
       :suit-dir-path="suitDirPath"
       @save="onTaskSave"
     />
+
+    <TemplateManager
+      v-model="showTemplateManager"
+      @apply="onApplyTemplate"
+    />
+
+    <el-dialog v-model="showSaveTemplate" title="保存为模版" width="460px" append-to-body>
+      <el-form :model="newTemplate" label-width="100px">
+        <el-form-item label="模版名称">
+          <el-input v-model="newTemplate.name" placeholder="如：AMD基础性能测试" />
+        </el-form-item>
+        <el-form-item label="机器类型">
+          <el-select v-model="newTemplate.machineType" style="width: 100%">
+            <el-option label="通用" value="通用" />
+            <el-option label="AMD" value="AMD" />
+            <el-option label="Intel" value="Intel" />
+            <el-option label="920B" value="920B" />
+            <el-option label="950" value="950" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="测试分类">
+          <el-select v-model="newTemplate.testCategory" style="width: 100%">
+            <el-option label="基础性能" value="基础性能" />
+            <el-option label="基础性能+nginx-redis" value="基础性能+nginx-redis" />
+            <el-option label="场景化测试" value="场景化测试" />
+            <el-option label="大数据测试" value="大数据测试" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showSaveTemplate = false">取消</el-button>
+        <el-button type="primary" @click="confirmSaveTemplate">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -90,9 +126,11 @@ import { VueDraggable } from 'vue-draggable-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Document, Download, Refresh, Check, VideoPlay,
-  Plus, Delete, Rank, CopyDocument
+  Plus, Delete, Rank, CopyDocument, Files
 } from '@element-plus/icons-vue'
 import TaskEditDialog from '../components/TaskEditDialog.vue'
+import TemplateManager from '../components/TemplateManager.vue'
+import type { TaskTemplate } from '@shared/types'
 
 const props = defineProps<{ connectionId: string }>()
 const emit = defineEmits<{ (e: 'navigate', view: string): void }>()
@@ -103,6 +141,14 @@ const tasks = ref<Record<string, any>[]>([])
 const showEditDialog = ref(false)
 const editingTask = ref<Record<string, any> | null>(null)
 const editingIndex = ref(-1)
+
+const showTemplateManager = ref(false)
+const showSaveTemplate = ref(false)
+const newTemplate = ref({
+  name: '',
+  machineType: '通用' as const,
+  testCategory: '基础性能' as const
+})
 
 const taskJsonPreview = computed(() => {
   return JSON.stringify(tasks.value, null, 2)
@@ -232,6 +278,44 @@ async function copyJson() {
   } catch {
     ElMessage.error('复制失败')
   }
+}
+
+function saveAsTemplate() {
+  if (!tasks.value.length) return
+  newTemplate.value = {
+    name: '',
+    machineType: '通用',
+    testCategory: '基础性能'
+  }
+  showSaveTemplate.value = true
+}
+
+async function confirmSaveTemplate() {
+  if (!newTemplate.value.name) {
+    ElMessage.warning('请输入模版名称')
+    return
+  }
+  try {
+    await window.api.template.save({
+      id: `tpl_${Date.now()}`,
+      name: newTemplate.value.name,
+      machineType: newTemplate.value.machineType,
+      testCategory: newTemplate.value.testCategory,
+      tasks: JSON.parse(JSON.stringify(tasks.value)),
+      isPreset: false,
+      createdAt: 0,
+      updatedAt: 0
+    })
+    ElMessage.success('模版已保存')
+    showSaveTemplate.value = false
+  } catch (err: any) {
+    ElMessage.error(`保存失败: ${err.message || err}`)
+  }
+}
+
+function onApplyTemplate(template: TaskTemplate) {
+  tasks.value = JSON.parse(JSON.stringify(template.tasks))
+  ElMessage.success(`已导入模版: ${template.name}`)
 }
 </script>
 

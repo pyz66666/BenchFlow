@@ -73,6 +73,55 @@ export interface DoInPXEAPI {
     list: () => Promise<TunnelInfo[]>
     removeAll: () => Promise<boolean>
   }
+  proxy: {
+    start: (port: number) => Promise<boolean>
+    stop: () => Promise<boolean>
+    status: () => Promise<boolean>
+    getLogs: () => Promise<ProxyLogEntry[]>
+    clearLogs: () => Promise<boolean>
+    onLog: (callback: (log: ProxyLogEntry) => void) => () => void
+  }
+  proxyConfig: {
+    apply: (connId: string, proxyIP: string, port: number) => Promise<{ success: boolean; message: string }>
+    remove: (connId: string) => Promise<{ success: boolean; message: string }>
+    detectOS: (connId: string) => Promise<{ type: string; pkgManager: string }>
+  }
+  template: {
+    getAll: () => Promise<TaskTemplate[]>
+    save: (template: TaskTemplate) => Promise<TaskTemplate[]>
+    remove: (id: string) => Promise<TaskTemplate[]>
+    exportAll: () => Promise<string>
+    import: (jsonStr: string) => Promise<TaskTemplate[]>
+  }
+}
+
+export interface TaskTemplateItem {
+  suite: string
+  ips: string[]
+  wait_time: number
+  [key: string]: any
+}
+
+export interface TaskTemplate {
+  id: string
+  name: string
+  machineType: 'AMD' | 'Intel' | '920B' | '950' | '通用'
+  testCategory: '基础性能' | '基础性能+nginx-redis' | '场景化测试' | '大数据测试'
+  tasks: TaskTemplateItem[]
+  isPreset: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ProxyLogEntry {
+  timestamp: number
+  sourceIP: string
+  method: string
+  targetHost: string
+  targetPort: number
+  status: 'connected' | 'error' | 'closed'
+  bytesSent: number
+  bytesReceived: number
 }
 
 export interface LocalIP {
