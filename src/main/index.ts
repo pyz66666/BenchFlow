@@ -1,23 +1,16 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { execSync } from 'child_process'
 import { SSHManager } from './ssh-manager'
-import type { SSHConfig } from './ssh-manager'
 import { DeviceStore } from './device-store'
-import type { SavedDevice } from './device-store'
 import { ConfigStore } from './config-store'
-import type { AppConfig } from './config-store'
 import { TunnelManager } from './tunnel-manager'
 import { ProxyManager } from './proxy-manager'
-import type { ProxyLogEntry } from './proxy-manager'
 import { ProxyConfigManager } from './proxy-config-manager'
 import { TemplateStore } from './template-store'
-import type { TaskTemplate } from './template-store'
-import type { TunnelConfig } from './tunnel-manager'
 
 const isDev = !app.isPackaged
 
-// 全局错误捕获 - 写入日志文件
 function writeErrorLog(msg: string) {
   try {
     const fs = require('fs')
@@ -30,6 +23,7 @@ function writeErrorLog(msg: string) {
 
 process.on('uncaughtException', (err) => {
   writeErrorLog(`uncaughtException: ${err.stack || err}`)
+  try { dialog.showErrorBox('错误', err.stack || String(err)) } catch {}
 })
 
 process.on('unhandledRejection', (err: any) => {
@@ -92,7 +86,7 @@ function createWindow() {
     minHeight: 600,
     title: 'BenchFlow',
     webPreferences: {
-      preload: join(__dirname, 'preload.js'),
+      preload: join(app.getAppPath(), 'dist-electron', 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -102,11 +96,11 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
   } else {
-    const indexPath = join(__dirname, '..', 'dist', 'index.html')
+    // 打包后 dist/index.html 在 app 根目录
+    const indexPath = join(app.getAppPath(), 'dist', 'index.html')
     writeErrorLog(`loading index.html from: ${indexPath}`)
     mainWindow.loadFile(indexPath).catch((err: any) => {
       writeErrorLog(`loadFile failed: ${err?.message || err}`)
-      const { dialog } = require('electron')
       dialog.showErrorBox('加载失败', `路径: ${indexPath}\n错误: ${err?.message || err}`)
     })
   }
@@ -129,9 +123,8 @@ app.whenReady().then(() => {
   try {
     createWindow()
   } catch (err: any) {
-    writeErrorLog(`createWindow error: ${err?.stack || err}`)
-    const { dialog } = require('electron')
-    dialog.showErrorBox('启动失败', err?.message || String(err))
+    writeErrorLog(`startup error: ${err?.stack || err}`)
+    dialog.showErrorBox('启动失败', err?.stack || err?.message || String(err))
   }
 
   app.on('activate', () => {
@@ -149,7 +142,7 @@ app.on('window-all-closed', () => {
 })
 
 // IPC: SSH 连接
-ipcMain.handle('ssh:connect', async (_event, config: SSHConfig) => {
+ipcMain.handle('ssh:connect', async (_event, config: any) => {
   return sshManager.connect(config)
 })
 
@@ -210,7 +203,7 @@ ipcMain.handle('device:getAll', async () => {
   return deviceStore.getAll()
 })
 
-ipcMain.handle('device:save', async (_event, device: SavedDevice) => {
+ipcMain.handle('device:save', async (_event, device: any) => {
   return deviceStore.add(device)
 })
 
@@ -218,7 +211,7 @@ ipcMain.handle('device:remove', async (_event, id: string) => {
   return deviceStore.remove(id)
 })
 
-ipcMain.handle('device:update', async (_event, id: string, patch: Partial<SavedDevice>) => {
+ipcMain.handle('device:update', async (_event, id: string, patch: any) => {
   return deviceStore.update(id, patch)
 })
 
@@ -227,7 +220,7 @@ ipcMain.handle('config:get', async () => {
   return configStore.get()
 })
 
-ipcMain.handle('config:save', async (_event, config: Partial<AppConfig>) => {
+ipcMain.handle('config:save', async (_event, config: any) => {
   return configStore.save(config)
 })
 
@@ -237,7 +230,7 @@ ipcMain.handle('local:getIPs', async () => {
 })
 
 // IPC: SSH 隧道管理
-ipcMain.handle('tunnel:create', async (_event, config: TunnelConfig) => {
+ipcMain.handle('tunnel:create', async (_event, config: any) => {
   return tunnelManager.create(config)
 })
 
@@ -283,7 +276,7 @@ ipcMain.handle('proxy:clearLogs', async () => {
 })
 
 // 代理日志实时推送
-proxyManager.onLog((log: ProxyLogEntry) => {
+proxyManager.onLog((log: any) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('proxy:log', log)
   }
@@ -307,7 +300,7 @@ ipcMain.handle('template:getAll', async () => {
   return templateStore.getAll()
 })
 
-ipcMain.handle('template:save', async (_event, template: TaskTemplate) => {
+ipcMain.handle('template:save', async (_event, template: any) => {
   return templateStore.save(template)
 })
 
