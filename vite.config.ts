@@ -21,7 +21,7 @@ export default defineConfig({
                 entryFileNames: 'main.js',
                 format: 'cjs'
               },
-              external: ['ssh2', 'node-ssh', 'electron']
+              external: ['ssh2', 'node-ssh', 'electron', 'cpu-features']
             }
           }
         }
