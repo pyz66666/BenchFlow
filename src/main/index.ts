@@ -17,24 +17,23 @@ import type { TunnelConfig } from './tunnel-manager'
 
 const isDev = !app.isPackaged
 
-// 全局错误捕获
+// 全局错误捕获 - 写入日志文件
+function writeErrorLog(msg: string) {
+  try {
+    const fs = require('fs')
+    const path = require('path')
+    const logPath = path.join(app.getPath('userData'), 'error.log')
+    const log = `[${new Date().toISOString()}] ${msg}\n`
+    fs.appendFileSync(logPath, log)
+  } catch {}
+}
+
 process.on('uncaughtException', (err) => {
-  const fs = require('fs')
-  const path = require('path')
-  const logPath = path.join(app.getPath('userData'), 'error.log')
-  const log = `[${new Date().toISOString()}] uncaughtException: ${err.stack || err}\n`
-  try { fs.appendFileSync(logPath, log) } catch {}
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.executeJavaScript(`alert('${err.message.replace(/'/g, "\\'")}')`)
-  }
+  writeErrorLog(`uncaughtException: ${err.stack || err}`)
 })
 
 process.on('unhandledRejection', (err: any) => {
-  const fs = require('fs')
-  const path = require('path')
-  const logPath = path.join(app.getPath('userData'), 'error.log')
-  const log = `[${new Date().toISOString()}] unhandledRejection: ${err?.stack || err}\n`
-  try { fs.appendFileSync(logPath, log) } catch {}
+  writeErrorLog(`unhandledRejection: ${err?.stack || err}`)
 })
 
 let mainWindow: BrowserWindow | null = null
@@ -84,6 +83,8 @@ function categorizeIP(ip: string): string {
 }
 
 function createWindow() {
+  writeErrorLog('createWindow start')
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -101,19 +102,37 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
   } else {
-    // 打包后 dist-electron/ 和 dist/ 都在 app 根目录下
     const indexPath = join(__dirname, '..', 'dist', 'index.html')
+    writeErrorLog(`loading index.html from: ${indexPath}`)
     mainWindow.loadFile(indexPath).catch((err: any) => {
-      console.error('Failed to load index.html:', err)
+      writeErrorLog(`loadFile failed: ${err?.message || err}`)
+      const { dialog } = require('electron')
+      dialog.showErrorBox('加载失败', `路径: ${indexPath}\n错误: ${err?.message || err}`)
     })
   }
+
+  mainWindow.webContents.on('did-fail-load', (_event: any, errorCode: number, errorDescription: string) => {
+    writeErrorLog(`did-fail-load: code=${errorCode} desc=${errorDescription}`)
+    const { dialog } = require('electron')
+    dialog.showErrorBox('页面加载失败', `错误码: ${errorCode}\n描述: ${errorDescription}`)
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+
+  writeErrorLog('createWindow done')
 }
 
 app.whenReady().then(() => {
-  createWindow()
+  writeErrorLog('app ready')
+  try {
+    createWindow()
+  } catch (err: any) {
+    writeErrorLog(`createWindow error: ${err?.stack || err}`)
+    const { dialog } = require('electron')
+    dialog.showErrorBox('启动失败', err?.message || String(err))
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
