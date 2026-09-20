@@ -16,6 +16,10 @@ if (!/electron-builder\s+--win\s+--x64/.test(windowsBuildCommand)) {
 }
 
 const nsis = packageJson.build?.nsis || {}
+if (packageJson.build?.appId !== 'com.benchflow.desktop') {
+  throw new Error('Windows installer must use the migrated BenchFlow application id')
+}
+
 if (nsis.oneClick !== false || nsis.allowToChangeInstallationDirectory !== true) {
   throw new Error('Windows installer must allow choosing a different installation directory')
 }

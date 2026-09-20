@@ -1,6 +1,6 @@
 {
   "name": "benchflow",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "BenchFlow - PXE 任务编排桌面客户端",
   "author": "pyz",
   "license": "MIT",
@@ -42,7 +42,7 @@
     "vue-tsc": "^2.0.0"
   },
   "build": {
-    "appId": "com.benchflow.app",
+    "appId": "com.benchflow.desktop",
     "productName": "BenchFlow",
     "directories": {
       "output": "release"
