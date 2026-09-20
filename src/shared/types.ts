@@ -127,6 +127,7 @@ export interface ProxyLogEntry {
 export interface LocalIP {
   category: string
   ip: string
+  netmask: string
 }
 
 export interface TunnelConfig {

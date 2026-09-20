@@ -1,7 +1,11 @@
-import { SSHManager } from './ssh-manager'
+import type { SSHManager } from './ssh-manager'
 
 export class ProxyConfigManager {
-  constructor(private ssh: SSHManager) {}
+  private ssh: SSHManager
+
+  constructor(ssh: SSHManager) {
+    this.ssh = ssh
+  }
 
   async detectOS(connId: string): Promise<{ type: string; pkgManager: string }> {
     const result = await this.ssh.exec(connId, 'cat /etc/os-release 2>/dev/null || cat /etc/redhat-release 2>/dev/null')
@@ -66,7 +70,20 @@ export NO_PROXY=localhost,127.0.0.1,::1
 EOF`)
     commands.push(`chmod 644 /etc/profile.d/proxy.sh`)
 
-    // 3. 包管理器配置
+    // 3. 当前 SSH 用户的交互式 Bash 环境
+    commands.push(`sed -i '/# >>> BenchFlow proxy >>>/,/# <<< BenchFlow proxy <<</d' "$HOME/.bashrc" 2>/dev/null || true`)
+    commands.push(`cat >> "$HOME/.bashrc" << 'EOF'
+# >>> BenchFlow proxy >>>
+export http_proxy=${proxyAddr}
+export https_proxy=${proxyAddr}
+export no_proxy=localhost,127.0.0.1,::1
+export HTTP_PROXY=${proxyAddr}
+export HTTPS_PROXY=${proxyAddr}
+export NO_PROXY=localhost,127.0.0.1,::1
+# <<< BenchFlow proxy <<<
+EOF`)
+
+    // 4. 包管理器配置
     if (pkgManager === 'dnf') {
       commands.push(`sed -i '/^proxy=/d' /etc/dnf/dnf.conf 2>/dev/null || true`)
       commands.push(`echo 'proxy=${proxyAddr}' >> /etc/dnf/dnf.conf`)
@@ -86,11 +103,11 @@ EOF`)
       commands.push(`echo 'proxy = ${proxyAddr}' >> /etc/zypp/zypp.conf`)
     }
 
-    // 4. 当前会话生效
+    // 5. 当前会话生效
     commands.push(`export http_proxy=${proxyAddr} https_proxy=${proxyAddr} no_proxy=localhost,127.0.0.1,::1`)
 
     // 执行所有命令
-    const fullCmd = commands.join(' && ')
+    const fullCmd = commands.join('\n')
     try {
       const result = await this.ssh.exec(connId, fullCmd)
       if (result.code !== 0 && result.stderr) {
@@ -118,6 +135,9 @@ EOF`)
     // 清理 profile.d
     commands.push(`rm -f /etc/profile.d/proxy.sh`)
 
+    // 清理当前 SSH 用户的交互式 Bash 配置
+    commands.push(`sed -i '/# >>> BenchFlow proxy >>>/,/# <<< BenchFlow proxy <<</d' "$HOME/.bashrc" 2>/dev/null || true`)
+
     // 清理包管理器配置
     if (pkgManager === 'dnf') {
       commands.push(`sed -i '/^proxy=/d' /etc/dnf/dnf.conf 2>/dev/null || true`)
@@ -133,7 +153,7 @@ EOF`)
 
     commands.push(`unset http_proxy https_proxy no_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY 2>/dev/null || true`)
 
-    const fullCmd = commands.join(' && ')
+    const fullCmd = commands.join('\n')
     try {
       await this.ssh.exec(connId, fullCmd)
     } catch {}

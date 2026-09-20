@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
-import { execSync } from 'child_process'
+import { networkInterfaces } from 'os'
 import { SSHManager } from './ssh-manager'
 import { DeviceStore } from './device-store'
 import { ConfigStore } from './config-store'
@@ -40,32 +40,14 @@ const proxyConfigManager = new ProxyConfigManager(sshManager)
 const templateStore = new TemplateStore()
 
 // 读取本机 IP
-function getLocalIPs(): { category: string; ip: string }[] {
-  const results: { category: string; ip: string }[] = []
-  try {
-    let output: string
-    if (process.platform === 'win32') {
-      output = execSync('ipconfig', { encoding: 'utf-8', timeout: 5000 })
-      const ipRegex = /IPv4[^\d]+(\d+\.\d+\.\d+\.\d+)/g
-      let match
-      while ((match = ipRegex.exec(output)) !== null) {
-        const ip = match[1]
-        results.push({ category: categorizeIP(ip), ip })
-      }
-    } else {
-      output = execSync('ifconfig 2>/dev/null || ip addr 2>/dev/null', { encoding: 'utf-8', timeout: 5000 })
-      const lines = output.split('\n')
-      for (const line of lines) {
-        const trimmed = line.trim()
-        const inetMatch = trimmed.match(/inet\s+(\d+\.\d+\.\d+\.\d+)/)
-        if (inetMatch) {
-          const ip = inetMatch[1]
-          if (ip === '127.0.0.1') continue
-          results.push({ category: categorizeIP(ip), ip })
-        }
-      }
+function getLocalIPs(): { category: string; ip: string; netmask: string }[] {
+  const results: { category: string; ip: string; netmask: string }[] = []
+  for (const interfaces of Object.values(networkInterfaces())) {
+    for (const address of interfaces || []) {
+      if (address.family !== 'IPv4' || address.internal) continue
+      results.push({ category: categorizeIP(address.address), ip: address.address, netmask: address.netmask })
     }
-  } catch {}
+  }
   return results
 }
 
@@ -92,19 +74,30 @@ function createWindow() {
     }
   })
 
+  let devLoadAttempts = 0
+  mainWindow.webContents.on('did-fail-load', (_event: any, errorCode: number, errorDescription: string) => {
+    writeErrorLog(`did-fail-load: code=${errorCode} desc=${errorDescription}`)
+    if (isDev && (errorCode === -102 || errorCode === -105) && devLoadAttempts < 20) {
+      setTimeout(() => {
+        if (!mainWindow || mainWindow.isDestroyed()) return
+        devLoadAttempts += 1
+        mainWindow.loadURL('http://localhost:5173').catch(() => {})
+      }, 250)
+      return
+    }
+    const { dialog } = require('electron')
+    const hint = isDev ? '\n\n开发模式请先运行 npm run electron:dev。' : ''
+    dialog.showErrorBox('页面加载失败', `错误码: ${errorCode}\n描述: ${errorDescription}${hint}`)
+  })
+
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173')
+    devLoadAttempts = 1
+    mainWindow.loadURL('http://localhost:5173').catch(() => {})
     mainWindow.webContents.openDevTools()
   } else {
     // 打包后 dist/index.html 在 app 根目录
     mainWindow.loadFile(join(__dirname, '../dist/index.html'))
   }
-
-  mainWindow.webContents.on('did-fail-load', (_event: any, errorCode: number, errorDescription: string) => {
-    writeErrorLog(`did-fail-load: code=${errorCode} desc=${errorDescription}`)
-    const { dialog } = require('electron')
-    dialog.showErrorBox('页面加载失败', `错误码: ${errorCode}\n描述: ${errorDescription}`)
-  })
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -244,8 +237,7 @@ ipcMain.handle('tunnel:removeAll', async () => {
 // IPC: 代理服务器
 ipcMain.handle('proxy:start', async (_event, port: number) => {
   try {
-    proxyManager.start(port)
-    return true
+    return await proxyManager.start(port)
   } catch (err: any) {
     console.error('[proxy:start]', err)
     return false

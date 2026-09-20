@@ -20,7 +20,8 @@ export class ProxyManager {
   private port = 8888
   private onLogCallback: ((log: ProxyLogEntry) => void) | null = null
 
-  start(port: number = 8888): boolean {
+  async start(port: number = 8888): Promise<boolean> {
+    if (this.running && this.port === port) return true
     if (this.running) this.stop()
     this.port = port
     this.logs = []
@@ -38,13 +39,15 @@ export class ProxyManager {
       this.running = false
     })
 
-    this.running = true
-
-    this.server.listen(port, '0.0.0.0', () => {
-      this.running = true
+    return new Promise((resolve) => {
+      const onStartError = () => resolve(false)
+      this.server!.once('error', onStartError)
+      this.server!.listen(port, '0.0.0.0', () => {
+        this.server!.off('error', onStartError)
+        this.running = true
+        resolve(true)
+      })
     })
-
-    return true
   }
 
   stop(): boolean {

@@ -1,6 +1,6 @@
 {
   "name": "benchflow",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "BenchFlow - PXE 任务编排桌面客户端",
   "author": "pyz",
   "license": "MIT",
@@ -14,7 +14,10 @@
     "electron:build:win": "vue-tsc --noEmit && vite build && electron-builder --win --x64 && npm run verify:win-package",
     "electron:build:mac": "vue-tsc --noEmit && vite build && electron-builder --mac",
     "typecheck": "vue-tsc --noEmit",
-    "verify:win-package": "node scripts/verify-win-package.cjs"
+    "verify:win-package": "node scripts/verify-win-package.cjs",
+    "test:network": "node --experimental-strip-types scripts/test-network-selection.mjs",
+    "test:proxy": "node --experimental-strip-types scripts/test-proxy-manager.mjs",
+    "test:proxy-config": "node --experimental-strip-types --experimental-specifier-resolution=node scripts/test-proxy-config.mjs"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",

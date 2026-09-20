@@ -75,6 +75,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Connection, VideoPlay, VideoPause } from '@element-plus/icons-vue'
 import type { LocalIP } from '@shared/types'
+import { selectLocalProxyIP } from '@shared/network'
 import TaskEditor from './TaskEditor.vue'
 import TestSuitManager from './TestSuitManager.vue'
 import TaskTemplate from './TaskTemplate.vue'
@@ -99,17 +100,8 @@ const localIPs = ref<LocalIP[]>([])
 const proxyApplied = ref(false)
 const appliedProxyIP = ref('')
 
-const serverCategory = computed(() => {
-  const host = props.host
-  if (host.startsWith('10.')) return '10'
-  if (host.startsWith('141.')) return '141'
-  if (host.startsWith('90.')) return '90'
-  return 'other'
-})
-
 const matchedLocalIP = computed(() => {
-  const matched = localIPs.value.find(ip => ip.category === serverCategory.value)
-  return matched?.ip || ''
+  return selectLocalProxyIP(props.host, localIPs.value)
 })
 
 onMounted(async () => {
@@ -147,6 +139,11 @@ async function applyProxy() {
 
   try {
     const loading = ElMessage({ message: '正在配置代理...', duration: 0, type: 'info' })
+    if (!await window.api.proxy.status() && !await window.api.proxy.start(8888)) {
+      loading.close()
+      ElMessage.error('本机代理启动失败，未修改远端服务器配置')
+      return
+    }
     const result = await window.api.proxyConfig.apply(props.connectionId, matchedLocalIP.value, 8888)
     loading.close()
 
