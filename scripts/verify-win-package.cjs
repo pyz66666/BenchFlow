@@ -6,7 +6,6 @@ const rootDir = resolve(__dirname, '..')
 const packageJson = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf8'))
 const excludedNativeModules = packageJson.build?.files?.includes('!**/*.node')
 const windowsBuildCommand = packageJson.scripts?.['electron:build:win'] || ''
-const installerScript = readFileSync(join(rootDir, 'build', 'installer.nsh'), 'utf8')
 
 if (!excludedNativeModules) {
   throw new Error('Windows package must exclude every native .node module')
@@ -14,14 +13,6 @@ if (!excludedNativeModules) {
 
 if (!/electron-builder\s+--win\s+--x64/.test(windowsBuildCommand)) {
   throw new Error('Windows build must explicitly target x64')
-}
-
-if (/Get-Process\s+-Name\s+\*BenchFlow\*/i.test(installerScript)) {
-  throw new Error('Installer must not terminate processes by the broad *BenchFlow* pattern')
-}
-
-if (!/taskkill\s+\/F\s+\/IM\s+BenchFlow\.exe\s+\/T/i.test(installerScript)) {
-  throw new Error('Installer must close only the running BenchFlow.exe process')
 }
 
 const appAsar = join(rootDir, 'release', 'win-unpacked', 'resources', 'app.asar')
@@ -55,4 +46,4 @@ if (nativeModules.length > 0) {
   throw new Error(`Windows package contains native modules:\n${nativeModules.join('\n')}`)
 }
 
-console.log('Windows package check passed: x64 installer, no native .node modules, and safe process shutdown')
+console.log('Windows package check passed: x64 installer with no native .node modules')
