@@ -1,6 +1,6 @@
 {
   "name": "benchflow",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "BenchFlow - PXE 任务编排桌面客户端",
   "author": "pyz",
   "license": "MIT",
@@ -69,9 +69,10 @@
       ]
     },
     "nsis": {
-      "oneClick": true,
+      "oneClick": false,
       "perMachine": false,
-      "runAfterFinish": true,
+      "allowToChangeInstallationDirectory": true,
+      "runAfterFinish": false,
       "deleteAppDataOnUninstall": false,
       "differentialPackage": false,
       "allowElevation": true

@@ -15,6 +15,15 @@ if (!/electron-builder\s+--win\s+--x64/.test(windowsBuildCommand)) {
   throw new Error('Windows build must explicitly target x64')
 }
 
+const nsis = packageJson.build?.nsis || {}
+if (nsis.oneClick !== false || nsis.allowToChangeInstallationDirectory !== true) {
+  throw new Error('Windows installer must allow choosing a different installation directory')
+}
+
+if (nsis.runAfterFinish !== false) {
+  throw new Error('Windows installer must not automatically restart the application after installation')
+}
+
 const appAsar = join(rootDir, 'release', 'win-unpacked', 'resources', 'app.asar')
 if (!existsSync(appAsar)) {
   throw new Error(`Windows package was not found: ${appAsar}`)
