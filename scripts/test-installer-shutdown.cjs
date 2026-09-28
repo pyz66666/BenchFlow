@@ -9,6 +9,9 @@ const indexSource = readFileSync(join(rootDir, 'src/main/index.ts'), 'utf8')
 if (packageJson.build?.nsis?.include !== 'build/installer.nsh') {
   throw new Error('NSIS shutdown hook is not configured')
 }
+if (packageJson.build?.nsis?.perMachine !== true) {
+  throw new Error('NSIS installer must run elevated for deterministic process shutdown')
+}
 if (!installerScript.includes('!macro customCheckAppRunning')) {
   throw new Error('NSIS custom app-running hook is missing')
 }

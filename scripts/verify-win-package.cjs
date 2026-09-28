@@ -22,8 +22,8 @@ if (packageJson.build?.appId !== 'com.benchflow.desktop') {
   throw new Error('Windows installer must use the migrated BenchFlow application id')
 }
 
-if (nsis.oneClick !== false || nsis.allowToChangeInstallationDirectory !== true) {
-  throw new Error('Windows installer must allow choosing a different installation directory')
+if (nsis.oneClick !== false || nsis.perMachine !== true || nsis.allowToChangeInstallationDirectory !== true) {
+  throw new Error('Windows installer must be assisted, per-machine, and allow choosing a different installation directory')
 }
 
 if (nsis.runAfterFinish !== false) {
