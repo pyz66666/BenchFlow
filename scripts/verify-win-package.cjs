@@ -16,6 +16,8 @@ if (!/electron-builder\s+--win\s+--x64/.test(windowsBuildCommand)) {
 }
 
 const nsis = packageJson.build?.nsis || {}
+const installerScriptPath = join(rootDir, 'build', 'installer.nsh')
+const installerScript = readFileSync(installerScriptPath, 'utf8')
 if (packageJson.build?.appId !== 'com.benchflow.desktop') {
   throw new Error('Windows installer must use the migrated BenchFlow application id')
 }
@@ -26,6 +28,18 @@ if (nsis.oneClick !== false || nsis.allowToChangeInstallationDirectory !== true)
 
 if (nsis.runAfterFinish !== false) {
   throw new Error('Windows installer must not automatically restart the application after installation')
+}
+
+if (nsis.include !== 'build/installer.nsh') {
+  throw new Error('Windows installer must include the custom process shutdown hook')
+}
+
+if (!/!macro\s+customCheckAppRunning/i.test(installerScript)) {
+  throw new Error('Installer must override the default app-running check')
+}
+
+if (!/taskkill\s+\/F\s+\/T\s+\/IM\s+"\$\{APP_EXECUTABLE_FILENAME\}"/i.test(installerScript)) {
+  throw new Error('Installer must terminate the BenchFlow process tree before copying files')
 }
 
 const appAsar = join(rootDir, 'release', 'win-unpacked', 'resources', 'app.asar')

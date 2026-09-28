@@ -76,9 +76,7 @@ export class TunnelManager {
     const entry = this.tunnels.get(id)
     if (!entry) return false
     if (entry.process) {
-      try {
-        entry.process.kill('SIGTERM')
-      } catch {}
+      await this.stopProcess(entry.process)
     }
     this.tunnels.delete(id)
     return true
@@ -106,5 +104,32 @@ export class TunnelManager {
       status: entry.status,
       bindAddress: entry.config.bindAddress
     }
+  }
+
+  private async stopProcess(proc: ChildProcess): Promise<void> {
+    if (proc.exitCode !== null || proc.signalCode !== null) return
+
+    await new Promise<void>((resolve) => {
+      let settled = false
+      const finish = () => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        proc.removeListener('exit', finish)
+        resolve()
+      }
+      const timer = setTimeout(finish, 1500)
+      proc.once('exit', finish)
+
+      try {
+        if (process.platform === 'win32' && proc.pid) {
+          exec(`taskkill /F /T /PID ${proc.pid}`, () => finish())
+        } else {
+          proc.kill('SIGTERM')
+        }
+      } catch {
+        finish()
+      }
+    })
   }
 }

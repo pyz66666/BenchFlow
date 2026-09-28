@@ -56,10 +56,8 @@ export class SSHManager {
     return true
   }
 
-  disconnectAll() {
-    for (const id of this.connections.keys()) {
-      this.disconnect(id)
-    }
+  async disconnectAll(): Promise<void> {
+    await Promise.all(Array.from(this.connections.keys()).map(id => this.disconnect(id)))
   }
 
   private getConnection(id: string): SSHConnection {

@@ -19,6 +19,7 @@ export class ProxyManager {
   private running = false
   private port = 8888
   private onLogCallback: ((log: ProxyLogEntry) => void) | null = null
+  private sockets = new Set<Socket>()
 
   async start(port: number = 8888): Promise<boolean> {
     if (this.running && this.port === port) return true
@@ -28,6 +29,10 @@ export class ProxyManager {
 
     this.server = httpCreateServer((req: IncomingMessage, res: ServerResponse) => {
       this.handleHttpRequest(req, res)
+    })
+    this.server.on('connection', (socket: Socket) => {
+      this.sockets.add(socket)
+      socket.once('close', () => this.sockets.delete(socket))
     })
 
     // CONNECT 方法用于 HTTPS 隧道
@@ -51,6 +56,10 @@ export class ProxyManager {
   }
 
   stop(): boolean {
+    for (const socket of this.sockets) {
+      socket.destroy()
+    }
+    this.sockets.clear()
     if (this.server) {
       this.server.close()
       this.server = null

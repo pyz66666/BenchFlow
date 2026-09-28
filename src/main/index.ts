@@ -31,6 +31,7 @@ process.on('unhandledRejection', (err: any) => {
 })
 
 let mainWindow: BrowserWindow | null = null
+const hasSingleInstanceLock = app.requestSingleInstanceLock()
 const sshManager = new SSHManager()
 const deviceStore = new DeviceStore()
 const configStore = new ConfigStore()
@@ -38,6 +39,18 @@ const tunnelManager = new TunnelManager()
 const proxyManager = new ProxyManager()
 const proxyConfigManager = new ProxyConfigManager(sshManager)
 const templateStore = new TemplateStore()
+let isQuitting = false
+let shutdownPromise: Promise<void> | null = null
+
+async function shutdownRuntime(): Promise<void> {
+  if (shutdownPromise) return shutdownPromise
+  shutdownPromise = (async () => {
+    proxyManager.stop()
+    await tunnelManager.removeAll()
+    await sshManager.disconnectAll()
+  })()
+  return shutdownPromise
+}
 
 // 读取本机 IP
 function getLocalIPs(): { category: string; ip: string; netmask: string }[] {
@@ -106,7 +119,18 @@ function createWindow() {
   writeErrorLog('createWindow done')
 }
 
+if (!hasSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (!mainWindow) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  })
+}
+
 app.whenReady().then(() => {
+  if (!hasSingleInstanceLock) return
   writeErrorLog('app ready')
   try {
     createWindow()
@@ -123,10 +147,16 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  sshManager.disconnectAll()
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', (event) => {
+  if (isQuitting) return
+  isQuitting = true
+  event.preventDefault()
+  shutdownRuntime().finally(() => app.quit())
 })
 
 // IPC: SSH 连接
