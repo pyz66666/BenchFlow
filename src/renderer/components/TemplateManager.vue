@@ -29,10 +29,11 @@
             <el-tag size="small" :type="row.isPreset ? 'warning' : ''">{{ row.isPreset ? '预设' : '自定义' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
               <el-button size="small" type="primary" @click="onApply(row)">应用</el-button>
+              <el-button size="small" :icon="Download" @click="onExportOne(row)">导出</el-button>
               <el-button size="small" :icon="Edit" @click="onEdit(row)" :disabled="row.isPreset">编辑</el-button>
               <el-button size="small" type="danger" :icon="Delete" @click="onRemove(row)" :disabled="row.isPreset">删除</el-button>
             </div>
@@ -52,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Upload, Download, Edit, Delete } from '@element-plus/icons-vue'
 import TemplateEditDialog from './TemplateEditDialog.vue'
@@ -68,6 +69,12 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 
 onMounted(async () => {
   await loadTemplates()
+})
+
+watch(() => props.modelValue, async (val) => {
+  if (val) {
+    await loadTemplates()
+  }
 })
 
 async function loadTemplates() {
@@ -126,6 +133,18 @@ async function exportTemplate() {
   a.click()
   URL.revokeObjectURL(url)
   ElMessage.success('导出成功')
+}
+
+function onExportOne(template: TaskTemplate) {
+  const json = JSON.stringify(template, null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${template.name}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success(`已导出 ${template.name}`)
 }
 </script>
 

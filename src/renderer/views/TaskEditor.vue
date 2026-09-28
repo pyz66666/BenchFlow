@@ -170,6 +170,14 @@ onMounted(async () => {
   await loadTaskJson()
 })
 
+async function refreshConfig() {
+  const config = await window.api.config.get()
+  taskJsonPath.value = config.taskJsonPath
+  suitDirPath.value = config.testSuitDirPath
+}
+
+defineExpose({ refreshConfig })
+
 function fixJsonContent(raw: string): string {
   return raw.replace(/:\s*\[([^\]]*)\]/g, (_match, inner: string) => {
     const fixed = inner.split(',').map((item: string) => {

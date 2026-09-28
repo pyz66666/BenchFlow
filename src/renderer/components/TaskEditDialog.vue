@@ -160,7 +160,6 @@ interface SuiteOption {
 }
 
 const suiteOptions = ref<SuiteOption[]>([])
-let suiteLoaded = false
 
 watch(() => props.modelValue, (val) => {
   if (val && props.task) {
@@ -184,15 +183,12 @@ watch(() => props.modelValue, (val) => {
       { key: 'wait_time', value: 60 }
     ]
   }
-  suiteLoaded = false
   if (val) {
     loadSuiteOptions()
   }
 })
 
 async function loadSuiteOptions() {
-  if (suiteLoaded) return
-  suiteLoaded = true
   if (!props.suitDirPath) return
   try {
     const entries = await window.api.ssh.listDir(props.connectionId, props.suitDirPath)
