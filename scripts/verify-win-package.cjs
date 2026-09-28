@@ -51,13 +51,13 @@ if (!existsSync(appAsar)) {
   throw new Error(`Windows package was not found: ${appAsar}`)
 }
 
-const builderDebug = join(rootDir, 'release', 'builder-debug.yml')
-if (existsSync(builderDebug)) {
-  const generatedScript = readFileSync(builderDebug, 'utf8')
-  const checkIndex = generatedScript.indexOf('!insertmacro CHECK_APP_RUNNING')
-  const uninstallIndex = generatedScript.indexOf('!insertmacro uninstallOldVersion')
+const installSectionTemplate = join(rootDir, 'node_modules', 'app-builder-lib', 'templates', 'nsis', 'installSection.nsh')
+if (existsSync(installSectionTemplate)) {
+  const installSection = readFileSync(installSectionTemplate, 'utf8')
+  const checkIndex = installSection.indexOf('!insertmacro CHECK_APP_RUNNING')
+  const uninstallIndex = installSection.indexOf('!insertmacro uninstallOldVersion')
   if (checkIndex < 0 || uninstallIndex < 0 || checkIndex > uninstallIndex) {
-    throw new Error('Generated NSIS script must close running apps before invoking the old uninstaller')
+    throw new Error('electron-builder must close running apps before invoking the old uninstaller')
   }
 }
 
