@@ -18,6 +18,9 @@ if (!installerScript.includes('!macro customCheckAppRunning')) {
 if (!installerScript.includes('taskkill /F /T /IM "${APP_EXECUTABLE_FILENAME}"')) {
   throw new Error('NSIS hook must terminate the application process tree')
 }
+if (!installerScript.includes('taskkill /F /T /IM "DoInPXE.exe"')) {
+  throw new Error('NSIS hook must terminate the legacy DoInPXE process')
+}
 if (!indexSource.includes("app.on('before-quit'")) {
   throw new Error('Electron shutdown cleanup is missing')
 }

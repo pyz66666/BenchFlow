@@ -42,9 +42,23 @@ if (!/taskkill\s+\/F\s+\/T\s+\/IM\s+"\$\{APP_EXECUTABLE_FILENAME\}"/i.test(insta
   throw new Error('Installer must terminate the BenchFlow process tree before copying files')
 }
 
+if (!/taskkill\s+\/F\s+\/T\s+\/IM\s+"DoInPXE\.exe"/i.test(installerScript)) {
+  throw new Error('Installer must terminate the legacy DoInPXE process during migration')
+}
+
 const appAsar = join(rootDir, 'release', 'win-unpacked', 'resources', 'app.asar')
 if (!existsSync(appAsar)) {
   throw new Error(`Windows package was not found: ${appAsar}`)
+}
+
+const builderDebug = join(rootDir, 'release', 'builder-debug.yml')
+if (existsSync(builderDebug)) {
+  const generatedScript = readFileSync(builderDebug, 'utf8')
+  const checkIndex = generatedScript.indexOf('!insertmacro CHECK_APP_RUNNING')
+  const uninstallIndex = generatedScript.indexOf('!insertmacro uninstallOldVersion')
+  if (checkIndex < 0 || uninstallIndex < 0 || checkIndex > uninstallIndex) {
+    throw new Error('Generated NSIS script must close running apps before invoking the old uninstaller')
+  }
 }
 
 const installer = join(rootDir, 'release', `BenchFlow-Setup-${packageJson.version}-x64.exe`)
