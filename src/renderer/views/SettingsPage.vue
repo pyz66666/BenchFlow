@@ -10,11 +10,11 @@
 
       <el-form :model="config" label-width="160px" label-position="right">
         <el-divider content-position="left">路径配置</el-divider>
-        <el-form-item label="task.json 路径">
-          <el-input v-model="config.taskJsonPath" placeholder="/home/AutoBench/config/task.json" />
+        <el-form-item label="tasks.json 路径">
+          <el-input v-model="config.taskJsonPath" placeholder="/home/AutoBench/config/tasks.json" />
         </el-form-item>
         <el-form-item label="测试套件目录">
-          <el-input v-model="config.testSuitDirPath" placeholder="/home/AutoBench/config/testsuit" />
+          <el-input v-model="config.testSuitDirPath" placeholder="/home/AutoBench/config/test_suites" />
         </el-form-item>
         <el-form-item label="文件浏览目录">
           <el-input v-model="config.fileBrowsePath" placeholder="/home/AutoBench/config" />

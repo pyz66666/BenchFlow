@@ -154,7 +154,12 @@ const ipInputValue = ref('')
 const ipInputRef = ref<any>(null)
 const arrayInputVisible = ref(-1)
 const arrayInputValue = ref('')
-const suiteOptions = ref<string[]>([])
+interface SuiteOption {
+  value: string
+  searchText: string
+}
+
+const suiteOptions = ref<SuiteOption[]>([])
 let suiteLoaded = false
 
 watch(() => props.modelValue, (val) => {
@@ -191,23 +196,41 @@ async function loadSuiteOptions() {
   if (!props.suitDirPath) return
   try {
     const entries = await window.api.ssh.listDir(props.connectionId, props.suitDirPath)
-    suiteOptions.value = entries
-      .filter((e: DirEntry) => !e.isDir && e.name.endsWith('.json'))
-      .map((e: DirEntry) => e.name.replace('.json', ''))
+    const jsonFiles = entries.filter((e: DirEntry) => !e.isDir && e.name.endsWith('.json'))
+    suiteOptions.value = await Promise.all(jsonFiles.map(async (file: DirEntry) => {
+      const value = file.name.replace(/\.json$/i, '')
+      try {
+        const path = `${props.suitDirPath.replace(/\/$/, '')}/${file.name}`
+        const content = await window.api.ssh.readFile(props.connectionId, path)
+        return { value, searchText: `${value} ${collectSuiteSearchText(JSON.parse(content))}`.toLowerCase() }
+      } catch {
+        return { value, searchText: value.toLowerCase() }
+      }
+    }))
   } catch {
     suiteOptions.value = []
   }
 }
 
-function querySuites(query: string, cb: (results: { value: string }[]) => void) {
-  if (!query) {
-    cb(suiteOptions.value.map(s => ({ value: s })))
-    return
+function collectSuiteSearchText(data: unknown): string {
+  const values: string[] = []
+  const visit = (value: unknown) => {
+    if (typeof value === 'string' || typeof value === 'number') values.push(String(value))
+    else if (Array.isArray(value)) value.forEach(visit)
+    else if (value && typeof value === 'object') Object.values(value).forEach(visit)
   }
-  const results = suiteOptions.value
-    .filter(s => s.toLowerCase().includes(query.toLowerCase()))
-    .map(s => ({ value: s }))
-  cb(results)
+  if (data && typeof data === 'object') {
+    const root = data as Record<string, unknown>
+    visit(root.testcase || root.taskcase || root)
+  }
+  return values.join(' ')
+}
+
+function querySuites(query: string, cb: (results: { value: string }[]) => void) {
+  const normalized = query.trim().toLowerCase()
+  cb(suiteOptions.value
+    .filter(option => !normalized || option.searchText.includes(normalized))
+    .map(option => ({ value: option.value })))
 }
 
 function showIpInput() {

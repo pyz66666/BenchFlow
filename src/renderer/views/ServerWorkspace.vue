@@ -129,7 +129,7 @@ async function applyProxy() {
   const proxyAddr = `${matchedLocalIP.value}:8888`
   try {
     await ElMessageBox.confirm(
-      `将在此服务器上配置代理：\nhttp_proxy=http://${proxyAddr}\n\n将自动配置:\n- 环境变量 (/etc/profile.d + /etc/environment)\n- 包管理器 (dnf/yum/apt/pacman/zypper)\n- 当前会话\n\n配置后将自动验证。确认?`,
+      `将在此服务器上写入代理地址：\nhttp_proxy=http://${proxyAddr}\n\n将配置:\n- 环境变量 (/etc/profile.d + /etc/environment)\n- 当前用户的 ~/.bashrc\n- 包管理器 (dnf/yum/apt/pacman/zypper)\n\n不会启动或检查本机的 8888 端口。确认?`,
       '配置代理',
       { type: 'info', confirmButtonText: '确认配置', cancelButtonText: '取消' }
     )
@@ -139,20 +139,15 @@ async function applyProxy() {
 
   try {
     const loading = ElMessage({ message: '正在配置代理...', duration: 0, type: 'info' })
-    if (!await window.api.proxy.status() && !await window.api.proxy.start(8888)) {
-      loading.close()
-      ElMessage.error('本机代理启动失败，未修改远端服务器配置')
-      return
-    }
     const result = await window.api.proxyConfig.apply(props.connectionId, matchedLocalIP.value, 8888)
     loading.close()
 
     if (result.success) {
       proxyApplied.value = true
       appliedProxyIP.value = matchedLocalIP.value
-      ElMessageBox.alert(result.message, '代理配置成功', { type: 'success' })
+      ElMessageBox.alert(result.message, '代理地址已写入', { type: 'success' })
     } else {
-      ElMessageBox.alert(result.message, '代理配置完成（部分验证失败）', { type: 'warning' })
+      ElMessageBox.alert(result.message, '代理地址写入失败', { type: 'error' })
     }
   } catch (err: any) {
     ElMessage.error(`配置失败: ${err.message || err}`)

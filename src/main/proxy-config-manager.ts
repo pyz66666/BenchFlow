@@ -106,20 +106,25 @@ EOF`)
     // 5. 当前会话生效
     commands.push(`export http_proxy=${proxyAddr} https_proxy=${proxyAddr} no_proxy=localhost,127.0.0.1,::1`)
 
-    // 执行所有命令
+    // 仅写入远端配置；代理服务的运行状态由外部代理软件负责。
     const fullCmd = commands.join('\n')
     try {
       const result = await this.ssh.exec(connId, fullCmd)
-      if (result.code !== 0 && result.stderr) {
-        // 部分命令可能失败，继续验证
+      if (result.code !== 0) {
+        return {
+          success: false,
+          message: `系统: ${type}, 包管理器: ${pkgManager}\n写入代理配置失败: ${result.stderr || `退出码 ${result.code}`}`
+        }
       }
-    } catch {}
-
-    // 验证
-    const verifyResult = await this.verifyProxy(connId, proxyAddr)
-    return {
-      success: verifyResult.success,
-      message: `系统: ${type}, 包管理器: ${pkgManager}\n${verifyResult.message}`
+      return {
+        success: true,
+        message: `系统: ${type}, 包管理器: ${pkgManager}\n已写入 HTTP/HTTPS 代理: ${proxyAddr}`
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `系统: ${type}, 包管理器: ${pkgManager}\n写入代理配置失败: ${error?.message || error}`
+      }
     }
   }
 
@@ -161,73 +166,4 @@ EOF`)
     return { success: true, message: '代理配置已移除' }
   }
 
-  async verifyProxy(connId: string, expectedProxy: string): Promise<{ success: boolean; message: string }> {
-    const checks: string[] = []
-
-    // 检查环境变量
-    try {
-      const result = await this.ssh.exec(connId, 'source /etc/profile.d/proxy.sh 2>/dev/null; echo "http_proxy=$http_proxy"')
-      if (result.stdout.includes(expectedProxy)) {
-        checks.push('✓ 环境变量 http_proxy 已配置')
-      } else {
-        checks.push('✗ 环境变量 http_proxy 未生效')
-      }
-    } catch {
-      checks.push('✗ 环境变量检查失败')
-    }
-
-    // 检查包管理器
-    const { pkgManager } = await this.detectOS(connId)
-    if (pkgManager === 'dnf') {
-      try {
-        const result = await this.ssh.exec(connId, 'grep proxy /etc/dnf/dnf.conf 2>/dev/null')
-        if (result.stdout.includes(expectedProxy)) {
-          checks.push('✓ dnf.conf 已配置代理')
-        } else {
-          checks.push('✗ dnf.conf 代理未找到')
-        }
-      } catch {
-        checks.push('✗ dnf.conf 检查失败')
-      }
-    } else if (pkgManager === 'yum') {
-      try {
-        const result = await this.ssh.exec(connId, 'grep proxy /etc/yum.conf 2>/dev/null')
-        if (result.stdout.includes(expectedProxy)) {
-          checks.push('✓ yum.conf 已配置代理')
-        } else {
-          checks.push('✗ yum.conf 代理未找到')
-        }
-      } catch {
-        checks.push('✗ yum.conf 检查失败')
-      }
-    } else if (pkgManager === 'apt') {
-      try {
-        const result = await this.ssh.exec(connId, 'cat /etc/apt/apt.conf.d/99proxy 2>/dev/null')
-        if (result.stdout.includes(expectedProxy)) {
-          checks.push('✓ apt 代理已配置')
-        } else {
-          checks.push('✗ apt 代理未找到')
-        }
-      } catch {
-        checks.push('✗ apt 检查失败')
-      }
-    }
-
-    // 尝试通过代理访问测试
-    try {
-      const result = await this.ssh.exec(connId, `source /etc/profile.d/proxy.sh 2>/dev/null; curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 http://mirrors.aliyun.com 2>/dev/null || echo 'fail'`)
-      if (result.stdout.trim() === '200' || result.stdout.trim() === '301' || result.stdout.trim() === '302') {
-        checks.push('✓ 代理连通性测试通过')
-      } else if (result.stdout.includes('fail')) {
-        checks.push('⚠ 代理连通性测试失败（代理服务可能未开启）')
-      } else {
-        checks.push(`⚠ 代理测试返回: ${result.stdout.trim()}`)
-      }
-    } catch {
-      checks.push('⚠ 代理连通性测试失败')
-    }
-
-    const success = checks.filter(c => c.startsWith('✓')).length >= 2
-    return { success, message: checks.join('\n') }
-  }
 }

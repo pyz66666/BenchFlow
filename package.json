@@ -9,15 +9,16 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "electron:dev": "vite && electron .",
+    "electron:dev": "vite",
     "electron:build": "vue-tsc --noEmit && vite build && electron-builder",
-    "electron:build:win": "vue-tsc --noEmit && vite build && electron-builder --win --x64 && npm run verify:win-package",
-    "electron:build:mac": "vue-tsc --noEmit && vite build && electron-builder --mac",
+    "electron:build:win": "vue-tsc --noEmit && vite build && electron-builder --win --x64 && npm run verify:win-package",    "electron:build:mac": "vue-tsc --noEmit && vite build && electron-builder --mac",
     "typecheck": "vue-tsc --noEmit",
     "verify:win-package": "node scripts/verify-win-package.cjs",
     "test:network": "node --experimental-strip-types scripts/test-network-selection.mjs",
     "test:proxy": "node --experimental-strip-types scripts/test-proxy-manager.mjs",
-    "test:proxy-config": "node --experimental-strip-types --experimental-specifier-resolution=node scripts/test-proxy-config.mjs"
+    "test:proxy-config": "node --experimental-strip-types --experimental-specifier-resolution=node scripts/test-proxy-config.mjs",
+    "test:testsuit-shape": "node scripts/test-testsuit-shape.mjs",
+    "test:suite-behavior": "node scripts/test-suite-behavior.mjs"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
@@ -63,9 +64,9 @@
       ]
     },
     "win": {
-      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
       "target": [
-        "nsis"
+        "dir"
       ]
     },
     "nsis": {
@@ -75,8 +76,7 @@
       "runAfterFinish": false,
       "deleteAppDataOnUninstall": false,
       "differentialPackage": false,
-      "allowElevation": true,
-      "include": "build/installer.nsh"
+      "allowElevation": true
     }
   }
 }

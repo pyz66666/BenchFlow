@@ -8,15 +8,6 @@ const ssh = {
     if (command.includes('/etc/os-release')) {
       return { code: 0, stdout: 'ID=ubuntu', stderr: '' }
     }
-    if (command.includes('echo "http_proxy=$http_proxy"')) {
-      return { code: 0, stdout: 'http_proxy=http://192.168.64.1:8888\n', stderr: '' }
-    }
-    if (command.includes('99proxy')) {
-      return { code: 0, stdout: 'Acquire::http::Proxy "http://192.168.64.1:8888";\n', stderr: '' }
-    }
-    if (command.includes('mirrors.aliyun.com')) {
-      return { code: 0, stdout: '200', stderr: '' }
-    }
     return { code: 0, stdout: '', stderr: '' }
   }
 }
@@ -31,5 +22,7 @@ assert.match(applyCommand, /\nEOF\nchmod 644 \/etc\/profile\.d\/proxy\.sh/)
 assert.match(applyCommand, /cat >> "\$HOME\/.bashrc" << 'EOF'/)
 assert.match(applyCommand, /# >>> BenchFlow proxy >>>/)
 assert.doesNotMatch(applyCommand, /EOF &&/)
+assert.doesNotMatch(commands.join('\n'), /mirrors\.aliyun\.com/)
+assert.match(result.message, /已写入 HTTP\/HTTPS 代理/)
 
 console.log('Proxy configuration here-document check passed')
