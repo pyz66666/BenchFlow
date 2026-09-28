@@ -104,10 +104,10 @@ export class TemplateStore {
       templates = []
     }
 
-    // 合并预设模版（用户不能删除/修改预设）
-    const presetIds = templates.filter(t => t.isPreset).map(t => t.id)
+    // 合并预设模版（如果用户没修改过则加入）
+    const ids = templates.map(t => t.id)
     for (const preset of PRESET_TEMPLATES) {
-      if (!presetIds.includes(preset.id)) {
+      if (!ids.includes(preset.id)) {
         templates.push(preset)
       }
     }
@@ -123,35 +123,18 @@ export class TemplateStore {
     if (!template.createdAt) template.createdAt = now
 
     if (idx >= 0) {
-      if (templates[idx].isPreset) {
-        // 预设模版不可覆盖，创建副本
-        template.id = `tpl_${now}`
-        template.isPreset = false
-        template.name = template.name + ' (副本)'
-        templates.push(template)
-      } else {
-        templates[idx] = template
-      }
+      templates[idx] = template
     } else {
       templates.push(template)
     }
 
-    // 只保存非预设模版
-    const toSave = templates.filter(t => !t.isPreset)
-    this.writeFile(toSave)
+    this.writeFile(templates)
     return this.getAll()
   }
 
   remove(id: string): TaskTemplate[] {
-    const templates = this.getAll()
-    const target = templates.find(t => t.id === id)
-    if (target?.isPreset) {
-      // 预设模版不可删除
-      return this.getAll()
-    }
-    const filtered = templates.filter(t => t.id !== id)
-    const toSave = filtered.filter(t => !t.isPreset)
-    this.writeFile(toSave)
+    const templates = this.getAll().filter(t => t.id !== id)
+    this.writeFile(templates)
     return this.getAll()
   }
 

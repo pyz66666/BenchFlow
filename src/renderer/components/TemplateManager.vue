@@ -34,8 +34,8 @@
             <div class="action-buttons">
               <el-button size="small" type="primary" @click="onApply(row)">应用</el-button>
               <el-button size="small" :icon="Download" @click="onExportOne(row)">导出</el-button>
-              <el-button size="small" :icon="Edit" @click="onEdit(row)" :disabled="row.isPreset">编辑</el-button>
-              <el-button size="small" type="danger" :icon="Delete" @click="onRemove(row)" :disabled="row.isPreset">删除</el-button>
+              <el-button size="small" :icon="Edit" @click="onEdit(row)">编辑</el-button>
+              <el-button size="small" type="danger" :icon="Delete" @click="onRemove(row)">删除</el-button>
             </div>
           </template>
         </el-table-column>

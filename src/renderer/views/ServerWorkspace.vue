@@ -61,11 +61,6 @@
           </el-tabs>
         </div>
       </el-tab-pane>
-
-      <!-- 配置 -->
-      <el-tab-pane label="配置" name="settings">
-        <SettingsPage />
-      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -81,7 +76,6 @@ import TestSuitManager from './TestSuitManager.vue'
 import TaskTemplate from './TaskTemplate.vue'
 import FileBrowser from './FileBrowser.vue'
 import ExecutionConsole from './ExecutionConsole.vue'
-import SettingsPage from './SettingsPage.vue'
 import ImagePathConfig from './pxe/ImagePathConfig.vue'
 import MachineInfoConfig from './pxe/MachineInfoConfig.vue'
 import PxeServerConfig from './pxe/PxeServerConfig.vue'

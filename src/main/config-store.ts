@@ -11,7 +11,7 @@ export interface AppConfig {
   downloadTxtPath: string
 }
 
-const DEFAULT_CONFIG: AppConfig = {
+export const DEFAULT_CONFIG: AppConfig = {
   taskJsonPath: '/home/AutoBench/config/tasks.json',
   testSuitDirPath: '/home/AutoBench/config/test_suites',
   execCommand: 'bash bin/submit_task.sh',
@@ -32,22 +32,10 @@ export class ConfigStore {
   }
 
   get(): AppConfig {
-    try {
-      if (!existsSync(this.filePath)) {
-        this.save(DEFAULT_CONFIG)
-        return DEFAULT_CONFIG
-      }
-      const content = readFileSync(this.filePath, 'utf-8')
-      return { ...DEFAULT_CONFIG, ...JSON.parse(content) }
-    } catch {
-      return DEFAULT_CONFIG
-    }
+    return DEFAULT_CONFIG
   }
 
-  save(config: Partial<AppConfig>): AppConfig {
-    const current = this.get()
-    const merged = { ...current, ...config }
-    writeFileSync(this.filePath, JSON.stringify(merged, null, 2), 'utf-8')
-    return merged
+  save(_config: Partial<AppConfig>): AppConfig {
+    return DEFAULT_CONFIG
   }
 }
