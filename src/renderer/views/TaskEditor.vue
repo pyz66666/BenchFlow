@@ -12,6 +12,14 @@
         </el-input>
         <el-button :icon="Download" @click="loadTaskJson">加载</el-button>
         <el-button :icon="Refresh" @click="loadTaskJson" :disabled="!taskJsonPath">刷新</el-button>
+        <el-button :icon="Upload" @click="importTask">导入任务</el-button>
+        <input
+          ref="taskFileInputRef"
+          type="file"
+          accept=".json,application/json"
+          style="display: none"
+          @change="onTaskFileSelected"
+        />
       </div>
       <div class="toolbar-right">
         <el-button :icon="Files" @click="showTemplateManager = true">模版</el-button>
@@ -126,7 +134,7 @@ import { VueDraggable } from 'vue-draggable-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Document, Download, Refresh, Check, VideoPlay,
-  Plus, Delete, Rank, CopyDocument, Files
+  Plus, Delete, Rank, CopyDocument, Files, Upload
 } from '@element-plus/icons-vue'
 import TaskEditDialog from '../components/TaskEditDialog.vue'
 import TemplateManager from '../components/TemplateManager.vue'
@@ -141,6 +149,7 @@ const tasks = ref<Record<string, any>[]>([])
 const showEditDialog = ref(false)
 const editingTask = ref<Record<string, any> | null>(null)
 const editingIndex = ref(-1)
+const taskFileInputRef = ref<HTMLInputElement | null>(null)
 
 const showTemplateManager = ref(false)
 const showSaveTemplate = ref(false)
@@ -174,6 +183,64 @@ function fixJsonContent(raw: string): string {
   })
 }
 
+function normalizeTask(task: Record<string, any>): Record<string, any> {
+  const { enabled, suit, suite, ...rest } = task
+  return { suite: suite || suit, ...rest }
+}
+
+function parseTasksJson(content: string): Record<string, any>[] {
+  let data: any
+  try {
+    data = JSON.parse(content)
+  } catch {
+    data = JSON.parse(fixJsonContent(content))
+  }
+
+  const imported = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.tasks)
+      ? data.tasks
+      : data && typeof data === 'object'
+        ? [data]
+        : []
+
+  if (!imported.length) {
+    throw new Error('文件中没有可导入的任务')
+  }
+
+  const tasksToImport = imported.map((task: any) => {
+    if (!task || typeof task !== 'object' || Array.isArray(task)) {
+      throw new Error('任务必须是 JSON 对象')
+    }
+    const normalized = normalizeTask(task)
+    if (!normalized.suite || typeof normalized.suite !== 'string') {
+      throw new Error('每个任务都必须包含 suite 字段')
+    }
+    return normalized
+  })
+
+  return tasksToImport
+}
+
+function importTask() {
+  taskFileInputRef.value?.click()
+}
+
+async function onTaskFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  if (!input.files?.length) return
+
+  try {
+    const imported = parseTasksJson(await input.files[0].text())
+    tasks.value.push(...imported)
+    ElMessage.success(`已导入 ${imported.length} 个任务`)
+  } catch (err: any) {
+    ElMessage.error(`导入失败: ${err.message || err}`)
+  } finally {
+    input.value = ''
+  }
+}
+
 async function loadTaskJson() {
   if (!taskJsonPath.value) {
     ElMessage.warning('请输入 task.json 路径')
@@ -188,10 +255,7 @@ async function loadTaskJson() {
       content = fixJsonContent(content)
       data = JSON.parse(content)
     }
-    tasks.value = (Array.isArray(data) ? data : (data.tasks || [])).map((t: any) => {
-      const { enabled, suit, suite, ...rest } = t
-      return { suite: suite || suit, ...rest }
-    })
+    tasks.value = (Array.isArray(data) ? data : (data.tasks || [])).map(normalizeTask)
     ElMessage.success(`加载成功，共 ${tasks.value.length} 个任务`)
   } catch (err: any) {
     ElMessage.error(`加载失败: ${err.message || err}`)
